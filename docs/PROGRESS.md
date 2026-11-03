@@ -21,7 +21,7 @@ Then tell Claude: "read docs/PROGRESS.md and continue with the next step".
 | 1 | Skeleton, config, DB schema + Alembic, Docker Compose, Makefile, CI | Done (committed) |
 | 2 | Domain models, city detection, EUR conversion, IQR stats, best deals | Done (committed) |
 | 3 | Bazaraki source: parser, polite client, cache, pagination | Done (committed) |
-| 4 | Telethon indexer + message parser + DB search | Code complete, **uncommitted**; DB tests unverified until CI runs |
+| 4 | Telethon indexer + message parser + DB search | Done (committed `10564ac`); DB tests unverified until CI runs |
 | 5 | Query expansion (Anthropic + rule-based fallback + DB cache) | Not started |
 | 6 | Search orchestrator, relevance filter, bot flow, service layer | Not started |
 | 7 | i18n (en/ru), filters, pagination UI, polish | Not started |
@@ -29,8 +29,8 @@ Then tell Claude: "read docs/PROGRESS.md and continue with the next step".
 
 ### Milestone 4: status
 
-All code is written and the local gate is green (173 passed, 10 skipped). **Uncommitted**: commit
-as "Milestone 4: Telegram indexer, parser and DB search" once happy.
+All code is written, committed (`10564ac`, not pushed) and the local gate is green (173 passed,
+10 skipped). Next up: milestone 5.
 
 What exists:
 - `domain/pricing.py`: `parse_price` (shared with Bazaraki) and `extract_price` for free text.
