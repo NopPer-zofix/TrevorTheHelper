@@ -55,6 +55,10 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/aggregator/db/migrations/*" = ["E501"]
+# Cyrillic / typographic characters are intentional in these modules and tests.
+"src/aggregator/domain/cities.py" = ["RUF001"]
+"src/aggregator/domain/pricing.py" = ["RUF001"]
+"tests/*" = ["RUF001", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"

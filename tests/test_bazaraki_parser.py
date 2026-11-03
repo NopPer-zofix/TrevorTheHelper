@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 from aggregator.domain.cities import City
+from aggregator.domain.pricing import parse_price
 from aggregator.sources.base import SourceError
-from aggregator.sources.bazaraki.parser import parse_price, parse_published, parse_search_page
+from aggregator.sources.bazaraki.parser import parse_published, parse_search_page
 
 FIXTURES = Path(__file__).parent / "fixtures"
 NOW = datetime(2026, 11, 3, 12, 0, tzinfo=UTC)

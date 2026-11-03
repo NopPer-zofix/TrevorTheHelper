@@ -6,11 +6,11 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from aggregator.domain.cities import City, detect_city
 from aggregator.domain.models import Listing
+from aggregator.domain.pricing import parse_price
 from aggregator.sources.base import SourceError
 from aggregator.sources.bazaraki import selectors as sel
 
@@ -46,25 +46,6 @@ def parse_published(text: str | None, now: datetime) -> datetime:
     if unit in _UNIT_SECONDS:
         return now - timedelta(seconds=count * _UNIT_SECONDS[unit])
     return now - timedelta(days=count * _UNIT_DAYS[unit])
-
-
-def parse_price(text: str | None) -> Decimal | None:
-    """Parse "€250", "€1,200", "1 200 €", "€1.200". No digits ("Negotiable", "Free") -> None."""
-    if not text:
-        return None
-    cleaned = re.sub(r"[^\d.,]", "", text)
-    if not any(ch.isdigit() for ch in cleaned):
-        return None
-    # "1.200" / "1,200" with exactly three trailing digits is a thousands separator.
-    if re.fullmatch(r"\d{1,3}([.,]\d{3})+", cleaned):
-        cleaned = re.sub(r"[.,]", "", cleaned)
-    else:
-        cleaned = cleaned.replace(",", ".")
-    try:
-        value = Decimal(cleaned)
-    except InvalidOperation:
-        return None
-    return value if value > 0 else None
 
 
 def _flight_stream(html: str) -> str:

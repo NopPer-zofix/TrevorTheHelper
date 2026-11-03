@@ -105,7 +105,7 @@ _PATTERNS: list[tuple[City, re.Pattern[str]]] = [
 
 
 def _normalize(text: str) -> str:
-    return text.lower().replace("ё", "е")  # noqa: RUF001 (yo -> ye)
+    return text.lower().replace("ё", "е")
 
 
 def detect_city(text: str) -> City:
