@@ -21,48 +21,45 @@ Then tell Claude: "read docs/PROGRESS.md and continue with the next step".
 | 1 | Skeleton, config, DB schema + Alembic, Docker Compose, Makefile, CI | Done (committed) |
 | 2 | Domain models, city detection, EUR conversion, IQR stats, best deals | Done (committed) |
 | 3 | Bazaraki source: parser, polite client, cache, pagination | Done (committed) |
-| 4 | Telethon indexer + message parser + DB search | **In progress** |
+| 4 | Telethon indexer + message parser + DB search | Code complete, **uncommitted**; DB tests unverified until CI runs |
 | 5 | Query expansion (Anthropic + rule-based fallback + DB cache) | Not started |
 | 6 | Search orchestrator, relevance filter, bot flow, service layer | Not started |
 | 7 | i18n (en/ru), filters, pagination UI, polish | Not started |
 | 8 | README (Mermaid diagram, setup, config table, ToS note, roadmap) | Not started |
 
-### Milestone 4: what exists / what is left
+### Milestone 4: status
 
-Done (uncommitted work is included in the latest WIP commit):
-- `domain/pricing.py`: `parse_price` (shared with Bazaraki) and `extract_price` for free text
-  (symbols/words for EUR USD GBP RUB UAH, labelled "цена 250", old-price skipping, ambiguity
-  guard: `iPhone 13 250€` / `Sofa 1 200€` return no price rather than a wrong one).
-  Tests: `tests/test_pricing.py`.
+All code is written and the local gate is green (173 passed, 10 skipped). **Uncommitted**: commit
+as "Milestone 4: Telegram indexer, parser and DB search" once happy.
 
-Left, in this order:
-1. `sources/telegram/parser.py`: `parse_message(text)` -> title (first meaningful line, strip
-   hashtags/emoji, <=120 chars), description, price via `extract_price`, city via `detect_city`,
-   `is_sold` (sold / продано / продан[аоы]? / неактуально, anywhere), `is_wanted` (куплю, ищу, wtb,
-   looking for, want to buy, wanted: only within the first ~100 chars). Do NOT match "продаю/продается".
-2. `db/repositories.py`: upsert on (source, external_id), `mark_deleted`, `deactivate_older_than`,
-   `search(terms, city, max_age_days)` using `search_vector @@ plainto_tsquery('simple', ...)` OR
-   `title %> / word_similarity`, ranked, limited. The 'simple' FTS config has no stemming, so the
-   trigram branch is what makes "велосипеды" match "велосипед".
-3. `sources/telegram/source.py`: `TelegramSource(ListingSource)` reading from the DB (not live).
-4. `sources/telegram/indexer.py` + `main.py`: Telethon client; resolve groups; backfill N days
-   (`iter_messages`, stop at cutoff, `wait_time=1`); handlers for NewMessage / MessageEdited /
-   MessageDeleted. Read-only: never call any send_* method (add a test that greps the source).
-   external_id = `<real chat id>:<msg id>` (use `telethon.utils.resolve_id`); url =
-   `https://t.me/<username>/<id>` or `https://t.me/c/<id>/<id>` for private groups.
-   Wanted posts are skipped (and deactivate an existing row on edit); sold posts are stored with
-   `is_active=False`. Invite links (`t.me/+...`) are unsupported: log and skip.
-5. `sources/telegram/login.py` + `make telegram-login`: interactive first login (phone, code, 2FA)
-   writing the session under `./data/` (Telethon appends `.session`; strip it from
-   `TELEGRAM_SESSION_PATH`). `main.py` must exit with a clear message if not authorized.
-6. docker-compose: replace `alembic upgrade head` inside `bot` with a one-shot `migrate` service
-   that bot and indexer depend on (`service_completed_successfully`) to avoid a migration race;
-   add an indexer healthcheck.
-7. CI: add a Postgres service; DB tests skip locally unless `TEST_DATABASE_URL` is set.
-   Idea for local verification without Docker: `pip install pgserver` in a scratch venv (unverified
-   that it ships `pg_trgm`).
-8. Tests: message parser (sold / wanted / city RU+EN / price), ingest decisions with fake Telethon
-   objects, repository + search against Postgres in CI.
+What exists:
+- `domain/pricing.py`: `parse_price` (shared with Bazaraki) and `extract_price` for free text.
+- `sources/telegram/parser.py`: `parse_message` -> title/description/price/city/`is_sold`/`is_wanted`.
+- `sources/telegram/ingest.py`: pure per-message decision (`ingest_message`): store, store inactive
+  (sold), skip wanted, skip empty. `deactivate_existing=False` for backfill (no pointless UPDATEs).
+- `db/repositories.py`: `ListingRepository` (`upsert`, `mark_deleted`, `deactivate_older_than`,
+  `search`). Search = `search_vector @@ plainto_tsquery('simple')` OR `title %> term`; FTS hits
+  rank above fuzzy ones, then word similarity, then newest.
+- `sources/telegram/source.py`: `TelegramSource` (DB only, wraps failures in `SourceError`).
+  `search_terms` moved to `sources/base.py` and shared with Bazaraki.
+- `sources/telegram/indexer.py`, `client.py`, `login.py`, `main.py`: Telethon indexer (group
+  resolution, backfill, NewMessage/Edited/Deleted handlers, 6-hourly retention), `make
+  telegram-login`, exits with a clear message if the session is not authorized.
+- docker-compose: one-shot `migrate` service; bot and indexer wait for it; both have healthchecks.
+- CI: Postgres 16 service + `TEST_DATABASE_URL`; DB tests skip locally without it.
+- Tests: parser, ingest + handlers with fake Telethon objects, group normalisation, source, and a
+  read-only guard (`tests/test_telegram_readonly.py` greps for send/edit/delete/join calls).
+
+Still to verify (needs Postgres, not possible locally: no Docker, and `pgserver` has no wheel for
+Python 3.13):
+- `tests/test_repositories.py` has never run. First CI run is the real check of the SQL
+  (`%>` operator, `plainto_tsquery(... ::regconfig)`, `ON CONFLICT ... constraint=`, ranking).
+  If it fails, fix the repository, not the tests, unless the test expectation is wrong.
+- The Telethon wiring itself (real login, backfill, live events) has only been tested with fakes.
+  Needs `make telegram-login` with the real account, then running the indexer against
+  `TELEGRAM_GROUPS`. The reader account must be a member of each group to receive live updates.
+- Backfill is sequential per group before live listening starts; handlers are registered first so
+  nothing is missed meanwhile.
 
 ## Decisions made (do not re-litigate)
 

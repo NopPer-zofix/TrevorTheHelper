@@ -58,6 +58,7 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 # Cyrillic / typographic characters are intentional in these modules and tests.
 "src/aggregator/domain/cities.py" = ["RUF001"]
 "src/aggregator/domain/pricing.py" = ["RUF001"]
+"src/aggregator/sources/telegram/parser.py" = ["RUF001", "RUF003"]
 "tests/*" = ["RUF001", "RUF003"]
 
 [tool.mypy]

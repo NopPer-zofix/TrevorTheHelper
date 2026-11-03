@@ -10,24 +10,12 @@ import structlog
 from aggregator.cache import Cache
 from aggregator.domain.cities import City
 from aggregator.domain.models import ExpandedQuery, Filters, Listing
-from aggregator.sources.base import SourceError
+from aggregator.sources.base import SourceError, search_terms
 from aggregator.sources.bazaraki.client import BazarakiClient
 from aggregator.sources.bazaraki.parser import SOURCE_NAME, parse_search_page
 from aggregator.sources.bazaraki.selectors import search_path
 
 log = structlog.get_logger()
-
-
-def search_terms(query: ExpandedQuery, max_terms: int) -> list[str]:
-    """Primary term first, then variants; case-insensitive dedupe; capped to stay polite."""
-    seen: set[str] = set()
-    terms: list[str] = []
-    for candidate in [query.normalized, *query.variants]:
-        cleaned = " ".join(candidate.split())
-        if cleaned and cleaned.lower() not in seen:
-            seen.add(cleaned.lower())
-            terms.append(cleaned)
-    return terms[: max(max_terms, 1)]
 
 
 class BazarakiSource:

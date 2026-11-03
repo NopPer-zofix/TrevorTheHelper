@@ -16,6 +16,18 @@ class SourceError(Exception):
     """
 
 
+def search_terms(query: ExpandedQuery, max_terms: int) -> list[str]:
+    """Primary term first, then variants; case-insensitive dedupe; capped at `max_terms`."""
+    seen: set[str] = set()
+    terms: list[str] = []
+    for candidate in [query.normalized, *query.variants]:
+        cleaned = " ".join(candidate.split())
+        if cleaned and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            terms.append(cleaned)
+    return terms[: max(max_terms, 1)]
+
+
 @runtime_checkable
 class ListingSource(Protocol):
     #: Stable identifier used in config, filters, the DB and the UI ("bazaraki", "telegram").

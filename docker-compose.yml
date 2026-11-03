@@ -3,10 +3,14 @@ x-app: &app
   env_file: .env
   environment:
     DATABASE_URL: postgresql+asyncpg://aggregator:aggregator@postgres:5432/aggregator
-  depends_on:
-    postgres:
-      condition: service_healthy
   restart: unless-stopped
+
+x-healthcheck: &app-healthcheck
+  test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/health')"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 20s
 
 services:
   postgres:
@@ -24,27 +28,35 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Runs migrations on start, then long-polls Telegram. Shares only the DB with the indexer.
+  # One-shot: applies migrations once, so bot and indexer never race to run them.
+  migrate:
+    <<: *app
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Long-polls Telegram. Shares only the DB with the indexer.
   bot:
     <<: *app
-    command: sh -c "alembic upgrade head && aggregator-bot"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+    command: aggregator-bot
+    healthcheck: *app-healthcheck
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   # Telethon reader: backfills history, then listens for new/edited/deleted messages.
+  # Needs the session created by `make telegram-login` in ./data.
   indexer:
     <<: *app
     command: aggregator-indexer
     volumes:
       - ./data:/app/data
+    healthcheck: *app-healthcheck
     depends_on:
-      bot:
-        condition: service_started
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check migrate up down
+.PHONY: install lint format typecheck test check migrate telegram-login up down
 
 PY ?= python
 
@@ -24,6 +24,11 @@ check: lint typecheck test
 
 migrate:
 	alembic upgrade head
+
+# One-time interactive login (phone, code, 2FA) for the read-only reader account. Writes the
+# session to ./data/, which docker-compose mounts into the indexer. Run before `make up`.
+telegram-login:
+	$(PY) -m aggregator.sources.telegram.login
 
 up:
 	docker compose up --build
