@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aggregator"
+version = "0.1.0"
+description = "Telegram bot that aggregates second-hand listings in Cyprus"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.13,<4",
+    "telethon>=1.36",
+    "httpx>=0.27",
+    "selectolax>=0.3.21",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    "anthropic>=0.40",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "structlog>=24.1",
+    "aiohttp>=3.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+aggregator-bot = "aggregator.bot.main:run"
+aggregator-indexer = "aggregator.sources.telegram.main:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aggregator"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/aggregator/db/migrations/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+ignore_missing_imports = true
+files = ["src/aggregator"]
+
+# Strict on core modules; the rest stays on mypy defaults until it stabilises.
+[[tool.mypy.overrides]]
+module = [
+    "aggregator.config",
+    "aggregator.cache",
+    "aggregator.domain.*",
+    "aggregator.analytics.*",
+    "aggregator.search.*",
+    "aggregator.query.*",
+    "aggregator.sources.base",
+    "aggregator.sources.registry",
+]
+strict = true

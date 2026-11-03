@@ -1,0 +1,50 @@
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://aggregator:aggregator@postgres:5432/aggregator
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aggregator
+      POSTGRES_PASSWORD: aggregator
+      POSTGRES_DB: aggregator
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aggregator"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Runs migrations on start, then long-polls Telegram. Shares only the DB with the indexer.
+  bot:
+    <<: *app
+    command: sh -c "alembic upgrade head && aggregator-bot"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Telethon reader: backfills history, then listens for new/edited/deleted messages.
+  indexer:
+    <<: *app
+    command: aggregator-indexer
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      bot:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
