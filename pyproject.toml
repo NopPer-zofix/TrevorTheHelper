@@ -59,6 +59,8 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 "src/aggregator/domain/cities.py" = ["RUF001"]
 "src/aggregator/domain/pricing.py" = ["RUF001"]
 "src/aggregator/sources/telegram/parser.py" = ["RUF001", "RUF003"]
+"src/aggregator/query/fallback.py" = ["RUF001"]
+"src/aggregator/query/llm.py" = ["RUF001"]
 "tests/*" = ["RUF001", "RUF003"]
 
 [tool.mypy]
