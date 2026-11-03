@@ -1,0 +1,68 @@
+"""Apply the user's filters/sort to an already-fetched result set (no re-fetching)."""
+
+from __future__ import annotations
+
+import statistics
+from collections import Counter
+from collections.abc import Sequence
+from datetime import datetime
+from decimal import Decimal
+
+from aggregator.analytics.stats import compute_stats, find_best_deals
+from aggregator.domain.models import Filters, Listing, SortOrder
+from aggregator.search.models import ResultView
+
+_NO_PRICE_LAST = Decimal("Infinity")
+
+
+def _passes(listing: Listing, filters: Filters) -> bool:
+    if filters.source is not None and listing.source != filters.source:
+        return False
+    if filters.min_price is None and filters.max_price is None:
+        return True
+    price = listing.price_eur
+    if price is None:  # an unpriced listing cannot satisfy a price bound
+        return False
+    if filters.min_price is not None and price < filters.min_price:
+        return False
+    return not (filters.max_price is not None and price > filters.max_price)
+
+
+def _newest_key(listing: Listing) -> datetime:
+    return listing.posted_at
+
+
+def sort_listings(listings: Sequence[Listing], order: SortOrder) -> list[Listing]:
+    """Unpriced listings always go last for price-based orders; ties are broken by recency."""
+    by_newest = sorted(listings, key=_newest_key, reverse=True)  # stable base order
+    if order is SortOrder.NEWEST:
+        return by_newest
+    if order is SortOrder.CHEAPEST:
+        return sorted(by_newest, key=lambda li: li.price_eur or _NO_PRICE_LAST)
+
+    # BEST_DEAL: lowest price relative to the median of the set (largest discount first).
+    prices = [p for li in listings if (p := li.price_eur) is not None]
+    if not prices:
+        return by_newest
+    median = Decimal(str(statistics.median(float(p) for p in prices)))
+    if median <= 0:
+        return by_newest
+    return sorted(by_newest, key=lambda li: (li.price_eur or _NO_PRICE_LAST) / median)
+
+
+def apply_filters(listings: Sequence[Listing], filters: Filters) -> list[Listing]:
+    return sort_listings([li for li in listings if _passes(li, filters)], filters.sort)
+
+
+def build_view(
+    listings: Sequence[Listing], filters: Filters, best_deal_ratio: float = 0.75
+) -> ResultView:
+    """Filtered + sorted listings with stats and best deals computed for exactly that subset."""
+    selected = apply_filters(listings, filters)
+    return ResultView(
+        listings=selected,
+        stats=compute_stats([li.price_eur for li in selected]),
+        best_deals=find_best_deals(selected, ratio=best_deal_ratio),
+        unpriced_count=sum(1 for li in selected if li.price_eur is None),
+        counts_by_source=dict(Counter(li.source for li in selected)),
+    )

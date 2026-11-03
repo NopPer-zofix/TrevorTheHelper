@@ -23,13 +23,58 @@ Then tell Claude: "read docs/PROGRESS.md and continue with the next step".
 | 3 | Bazaraki source: parser, polite client, cache, pagination | Done (committed) |
 | 4 | Telethon indexer + message parser + DB search | Done (committed `10564ac`); DB tests unverified until CI runs |
 | 5 | Query expansion (Anthropic + rule-based fallback + DB cache) | Done (see below); `DbExpansionStore` SQL unverified until CI |
-| 6 | Search orchestrator, relevance filter, bot flow, service layer | Not started |
-| 7 | i18n (en/ru), filters, pagination UI, polish | Not started |
+| 6 | Search orchestrator, relevance filter, bot flow, service layer | Done (see below); never run against real Telegram/Bazaraki/DB yet |
+| 7 | Filters UI (min/max price, sort, source, reset) + polish | Not started (i18n en/ru and Prev/Next pagination were pulled into 6) |
 | 8 | README (Mermaid diagram, setup, config table, ToS note, roadmap) | Not started |
+
+### Milestone 6: status
+
+Local gate green (302 passed, 13 skipped = CI-only DB tests). Next up: milestone 7.
+
+Scope note: i18n (en/ru catalogs) and Prev/Next pagination were built here instead of in 7,
+because the results message and every handler needed them. Milestone 7 is now: the **Filters
+button/flow** (min/max price input, sort, source, "Reset filters"), then polish.
+
+What exists:
+- `search/relevance.py`: `RelevanceScorer` / `filter_relevant`. Token coverage over `normalized` +
+  `variants` (digits exact, prefix-stemming for words, letters/digits split so `iphone13` ==
+  `iphone 13`), spec tokens weigh 0.25, description-only matches x0.85, threshold
+  `RELEVANCE_MIN_SCORE` (0.75). `negative_terms` match the title only and are cancelled when the
+  title shows a bundle ("with charger", "+ case", "incl"). Known limits: "iPhone 13 Pro Max"
+  passes for "iphone 13"; a wrong storage size is not penalised beyond the missing spec.
+- `search/orchestrator.py`: concurrent fan-out, per-source timeout, any exception -> a failed
+  `SourceStatus` (partial results), city scoping via `city_matches`, per-source relevance filter,
+  dedupe by (source, external_id), progress callback per source. Sources always get default
+  `Filters()`; user filters are applied afterwards (`search/filters.py`: `apply_filters`,
+  `sort_listings`, `build_view` -> stats + best deals for the filtered subset).
+- `sources/registry.py` (`build_registry`, ordered by `ENABLED_SOURCES`, closes the Bazaraki
+  client) and `sources/facebook/source.py` (stub, only added with `ENABLE_FACEBOOK_MARKETPLACE`).
+- `services/`: `UserService` (+ `DbUserStore`, `InMemoryUserStore`), `check_quota` (monetization
+  seam), `SlidingWindowRateLimiter`, `SessionStore` (last result set per user, in the `Cache`
+  interface, TTL `RESULT_SESSION_TTL_SECONDS`), `SearchService` (validate -> expand ->
+  orchestrate -> `search_log`; `view(outcome, filters)`).
+- `bot/`: `i18n.py` (en/ru, parity enforced by a test), `formatting.py` (HTML, escaping, 4096
+  guard that shortens titles then drops cards, never cuts markup), `keyboards.py`
+  (`lang:`/`city:`/`pg:` callbacks), `handlers.py` (`build_router()` factory), `middlewares.py`
+  (allowlist, rate limit), `progress.py` (one "Searching..." message edited in place),
+  `runner.py` (polling now; `run_webhook` is a documented stub), `main.py` (real wiring).
+- Tests: relevance, filters, orchestrator with fake sources, a full bot-flow test that feeds real
+  updates through the real dispatcher with a recording Telegram session, formatting limits,
+  services, registry. `tests/test_user_store.py` needs Postgres (CI only).
+
+Not verified (do this first when Docker/Postgres or a free evening is available):
+- A real run: `.env` has `BOT_TOKEN`, Telegram API creds and groups, but the local Postgres
+  `aggregator` role fails auth and the Telethon session has not been created. Run migrations
+  (`alembic upgrade head`), `make telegram-login` equivalent, then `aggregator-indexer` and
+  `aggregator-bot`, and try "iphone 13" end to end. Bazaraki live scraping has never been run
+  from the bot either.
+- `DbUserStore` / `DbSearchLogStore` / `DbExpansionStore` SQL (CI will run them).
+- **`ALLOWED_USER_IDS` is empty in `.env`: the bot is public until you add your Telegram id.**
+- With no `ANTHROPIC_API_KEY` the rule-based fallback is used (works, but fewer variants).
 
 ### Milestone 5: status
 
-Local gate green (207 passed, 11 skipped = DB tests). Next up: milestone 6.
+Local gate green (207 passed, 11 skipped = DB tests).
 
 `query/` package (strict mypy):
 - `normalize.py`: `normalize_input` (cache key: casefold, NFKC, punctuation stripped except `+ . -`,
@@ -112,9 +157,14 @@ in CI, or later with a throwaway `postgres:16-alpine` container and `TEST_DATABA
   Docker 29 is installed but the daemon was not running; a local Postgres 18 service exists but the
   `aggregator` role in `.env` fails authentication. Use the venv tools directly (see top). DB-backed
   tests (`TEST_DATABASE_URL`, they DROP all tables) are skipped locally.
-- `.env` exists locally (gitignored) with `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, and
-  `TELEGRAM_GROUPS=https://t.me/baraholka_kipr`. Still empty/unknown: `BOT_TOKEN`,
-  `ANTHROPIC_API_KEY`, `ALLOWED_USER_IDS`. Never print or commit secrets.
+- `.env` exists locally (gitignored) with `BOT_TOKEN`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`,
+  and `TELEGRAM_GROUPS=https://t.me/baraholka_kipr`. Still empty: `ANTHROPIC_API_KEY`,
+  `ALLOWED_USER_IDS`. Never print or commit secrets.
+- **Running `aggregator-bot` locally starts a LIVE bot** (`@TrevorTheHelp_bot`) on the real token.
+  Do not "smoke test" it by running it. In PowerShell, `$env:X=''` DELETES the variable, so
+  settings then fall back to `.env`; to blank a value use a different mechanism (or `Settings(
+  _env_file=None)` in code). One accidental run happened in milestone 6: ~2 minutes of polling, no
+  updates handled, then killed; side effects were only `delete_webhook` + `set_my_commands`.
 - selectolax >= 1.0 only has the lexbor backend: `from selectolax.lexbor import ...`.
 - Writing files containing Cyrillic through bash heredocs failed once; use the editor tools.
 - `claude doctor` in this shell fails ("native binary not installed"): the npm wrapper's postinstall

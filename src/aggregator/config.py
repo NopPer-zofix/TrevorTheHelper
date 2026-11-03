@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     # --- Listings / analytics ----------------------------------------------------------
     listing_max_age_days: int = 30
     best_deal_ratio: float = 0.75
+    # Listings scoring below this against the expanded query are dropped (0..1).
+    relevance_min_score: float = 0.75
+    max_query_length: int = 100
+    # How long a user can page through / re-filter the last result set.
+    result_session_ttl_seconds: int = 3600
 
     # --- Rate limiting / quota ---------------------------------------------------------
     rate_limit_enabled: bool = False
