@@ -53,6 +53,36 @@ EN: dict[str, str] = {
     "card_posted": "posted {date}",
     "btn_prev": "◀ Prev",
     "btn_next": "Next ▶",
+    # --- filters ---
+    "btn_filters": "⚙️ Filters",
+    "btn_reset_filters": "✖ Reset filters",
+    "btn_back": "◀ Back to results",
+    "btn_cancel": "Cancel",
+    "btn_min_price": "Min price",
+    "btn_max_price": "Max price",
+    "filters_title": "⚙️ <b>Filters</b>",
+    "filter_price": "Price: {value}",
+    "filter_sort": "Sort: {value}",
+    "filter_source": "Source: {value}",
+    "price_any": "any",
+    "price_range": "{low} – {high}",
+    "price_from": "from {low}",
+    "price_upto": "up to {high}",
+    "sort.newest": "Newest",
+    "sort.cheapest": "Cheapest",
+    "sort.best_deal": "Best deal",
+    "source.all": "All sources",
+    "filters_matching": "{shown} of {total} listings match.",
+    "filters_active": "🔧 <b>Filters:</b> {summary} — showing {shown} of {total}",
+    "prompt_min_price": (
+        "Send the <b>minimum</b> price in EUR, e.g. <i>150</i>. Send 0 to remove it."
+    ),
+    "prompt_max_price": (
+        "Send the <b>maximum</b> price in EUR, e.g. <i>500</i>. Send 0 to remove it."
+    ),
+    "price_range_error": "The minimum can't be higher than the maximum. Try another number.",
+    "no_match_filters": "No listings match your filters ({total} found before filtering).",
+    "non_text": "I can only read text. Send me a product name to search for.",
     "btn_page": "{page}/{pages}",
     # --- problems ---
     "no_results": (
@@ -118,6 +148,36 @@ RU: dict[str, str] = {
     "card_posted": "размещено {date}",
     "btn_prev": "◀ Назад",
     "btn_next": "Вперёд ▶",
+    # --- filters ---
+    "btn_filters": "⚙️ Фильтры",
+    "btn_reset_filters": "✖ Сбросить фильтры",
+    "btn_back": "◀ К результатам",
+    "btn_cancel": "Отмена",
+    "btn_min_price": "Мин. цена",
+    "btn_max_price": "Макс. цена",
+    "filters_title": "⚙️ <b>Фильтры</b>",
+    "filter_price": "Цена: {value}",
+    "filter_sort": "Сортировка: {value}",
+    "filter_source": "Источник: {value}",
+    "price_any": "любая",
+    "price_range": "{low} – {high}",
+    "price_from": "от {low}",
+    "price_upto": "до {high}",
+    "sort.newest": "Сначала новые",
+    "sort.cheapest": "Сначала дешёвые",
+    "sort.best_deal": "Выгодные",
+    "source.all": "Все источники",
+    "filters_matching": "Подходит объявлений: {shown} из {total}.",
+    "filters_active": "🔧 <b>Фильтры:</b> {summary} — показано {shown} из {total}",
+    "prompt_min_price": (
+        "Отправьте <b>минимальную</b> цену в евро, например <i>150</i>. 0 — убрать ограничение."
+    ),
+    "prompt_max_price": (
+        "Отправьте <b>максимальную</b> цену в евро, например <i>500</i>. 0 — убрать ограничение."
+    ),
+    "price_range_error": "Минимум не может быть больше максимума. Попробуйте другое число.",
+    "no_match_filters": "Под ваши фильтры ничего не подходит (до фильтрации найдено: {total}).",
+    "non_text": "Я понимаю только текст. Отправьте название товара для поиска.",
     "btn_page": "{page}/{pages}",
     # --- problems ---
     "no_results": (

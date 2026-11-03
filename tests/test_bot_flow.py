@@ -92,6 +92,7 @@ class Harness:
         )
         self.dp: Dispatcher = build_dispatcher(self.services, settings)
         self._update_id = 0
+        self.last_host_id = 0  # id of the message the last tapped button was attached to
 
     def _user(self, user_id: int = USER_ID, lang: str = "en") -> User:
         return User(id=user_id, is_bot=False, first_name="T", language_code=lang)
@@ -107,6 +108,17 @@ class Harness:
         )
         await self.dp.feed_update(self.bot, Update(update_id=self._update_id, message=message))
 
+    async def send_without_text(self, user_id: int = USER_ID) -> None:
+        """A message with no text at all (photo, sticker, voice...)."""
+        self._update_id += 1
+        message = Message(
+            message_id=self._update_id,
+            date=datetime.now(UTC),
+            chat=Chat(id=user_id, type="private"),
+            from_user=self._user(user_id),
+        )
+        await self.dp.feed_update(self.bot, Update(update_id=self._update_id, message=message))
+
     async def tap(self, data: str, user_id: int = USER_ID, lang: str = "en") -> None:
         self._update_id += 1
         host = Message(
@@ -115,6 +127,7 @@ class Harness:
             chat=Chat(id=user_id, type="private"),
             text="previous bot message",
         )
+        self.last_host_id = host.message_id
         callback = CallbackQuery(
             id=str(self._update_id),
             from_user=self._user(user_id, lang),
@@ -213,7 +226,7 @@ async def test_search_edits_one_message_and_shows_stats_deals_and_cards(
     assert "Average" in text and "Median" in text and "Min" in text and "Max" in text
     assert "Listings" in text and "1/2" in text  # 8 listings -> 2 pages of 5
     assert "Чехол" not in text
-    assert harness.session.buttons(final) == ["noop", "pg:1"]
+    assert harness.session.buttons(final) == ["noop", "pg:1", "f:menu"]
     assert re.search(r'<a href="https://example\.test/[^"]+">', text)
     assert len(text) <= 4096
 
@@ -232,7 +245,7 @@ async def test_pagination_prev_next_and_expired_sessions(harness: Harness) -> No
     await harness.tap("pg:1")
     page2 = harness.session.of(EditMessageText)[-1]
     assert "page 2/2" in page2.text
-    assert harness.session.buttons(page2) == ["pg:0", "noop"]
+    assert harness.session.buttons(page2) == ["pg:0", "noop", "f:menu"]
 
     await harness.tap("pg:99")  # out of range is clamped, never crashes
     assert "page 2/2" in harness.session.of(EditMessageText)[-1].text

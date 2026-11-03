@@ -1,6 +1,6 @@
 # Progress and resume guide
 
-Spec: `docs/BUILD_PROMPT.md` (milestones in §9). Last updated: 2026-11-03 (milestone 5).
+Spec: `docs/BUILD_PROMPT.md` (milestones in §9). Last updated: 2026-11-03 (milestone 7).
 
 ## Resume in 30 seconds
 
@@ -24,16 +24,47 @@ Then tell Claude: "read docs/PROGRESS.md and continue with the next step".
 | 4 | Telethon indexer + message parser + DB search | Done (committed `10564ac`); DB tests unverified until CI runs |
 | 5 | Query expansion (Anthropic + rule-based fallback + DB cache) | Done (see below); `DbExpansionStore` SQL unverified until CI |
 | 6 | Search orchestrator, relevance filter, bot flow, service layer | Done (see below); never run against real Telegram/Bazaraki/DB yet |
-| 7 | Filters UI (min/max price, sort, source, reset) + polish | Not started (i18n en/ru and Prev/Next pagination were pulled into 6) |
+| 7 | Filters UI (min/max price, sort, source, reset) + polish | Done (see below) |
 | 8 | README (Mermaid diagram, setup, config table, ToS note, roadmap) | Not started |
+
+### Milestone 7: status
+
+Local gate green (343 passed, 13 skipped = CI-only DB tests). Next up: milestone 8 (README).
+
+What exists:
+- `services/filters.py` (pure, unit-tested): `parse_price_input` (strict: the whole message must be
+  a number, optional euro marker; `0` clears the bound; anything else -> None), `set_price_bound`
+  (bounds can never cross -> `FilterError("range")`), `set_sort`, `set_source` (only enabled
+  sources accepted).
+- Results screen keyboard: pager + **Filters** (+ **Reset filters** when any are active). Filters
+  menu (`f:menu`): sort row, source row (All + enabled sources, `✓` on the active one), Min/Max
+  price buttons (show the current value), Reset, Back. Callback data `f:menu|back|reset|reset:menu|
+  sort:<order>|src:<name|all>|price:<min|max>`. Any filter change returns to page 1; stats and
+  best deals are recomputed for the filtered subset; nothing is re-fetched (a test asserts this).
+- Price entry is stateless-ish: `SearchSession.pending_price` + `anchor_message_id`. The
+  `awaiting_price` handler filter claims a message only if it is a bare number while a price is
+  pending; anything else (a new product name) falls through to a normal search, which replaces the
+  session. The typed price edits the filters message in place.
+- Filters that exclude every listing show "No listings match your filters" with Filters/Reset still
+  reachable; an active-filters line (`Filters: from €100 · Cheapest — showing 5 of 8`) is shown in
+  the results header.
+- Polish: non-text messages get a friendly reply; Bazaraki posted dates are shown as `~dd.mm.yyyy`
+  (relative dates only); expired/forged filter callbacks are harmless.
+- Tests: `test_filters_service.py`, `test_bot_filters.py` (14 flow tests via the real dispatcher).
+  A mutation check showed that "pending price is cleared once accepted" was untested; a test was
+  added for it.
+
+Known limitations (candidates for the README):
+- Old result messages stay clickable but act on the user's *latest* search session.
+- Sessions are in memory: a bot restart or the TTL expires them ("results have expired").
+- Only euro price filters; listings without a price are excluded whenever a price bound is set.
 
 ### Milestone 6: status
 
-Local gate green (302 passed, 13 skipped = CI-only DB tests). Next up: milestone 7.
+Local gate green (302 passed, 13 skipped = CI-only DB tests).
 
 Scope note: i18n (en/ru catalogs) and Prev/Next pagination were built here instead of in 7,
-because the results message and every handler needed them. Milestone 7 is now: the **Filters
-button/flow** (min/max price input, sort, source, "Reset filters"), then polish.
+because the results message and every handler needed them.
 
 What exists:
 - `search/relevance.py`: `RelevanceScorer` / `filter_relevant`. Token coverage over `normalized` +

@@ -9,13 +9,16 @@ from html import escape
 
 from aggregator.bot.i18n import Texts
 from aggregator.domain.cities import City
-from aggregator.domain.models import BestDeal, Listing
+from aggregator.domain.models import BestDeal, Filters, Listing, SortOrder
 from aggregator.search.models import ResultView, SearchOutcome, SourceStatus
 
 PAGE_SIZE = 5
 TELEGRAM_MESSAGE_LIMIT = 4096
 _SAFETY_MARGIN = 96  # room for tags the length estimate does not see
 _TITLE_LENGTHS = (80, 50, 30)
+
+# Bazaraki only exposes relative dates ("3 days ago"), so its posted-at is an estimate.
+APPROXIMATE_DATE_SOURCES = frozenset({"bazaraki"})
 
 SOURCE_LABELS = {"bazaraki": "Bazaraki", "telegram": "Telegram", "facebook": "Facebook"}
 
@@ -74,7 +77,9 @@ def format_progress(
 # --- results ------------------------------------------------------------------------------
 
 
-def _header(t: Texts, outcome: SearchOutcome, view: ResultView) -> list[str]:
+def _header(
+    t: Texts, outcome: SearchOutcome, view: ResultView, filters: Filters | None = None
+) -> list[str]:
     lines = [
         t(
             "header",
@@ -90,6 +95,15 @@ def _header(t: Texts, outcome: SearchOutcome, view: ResultView) -> list[str]:
     ]
     if parts:
         lines.append(t("found_per_source", total=len(view.listings), parts=" · ".join(parts)))
+    if filters is not None and not filters.is_default:
+        lines.append(
+            t(
+                "filters_active",
+                summary=format_filters_summary(t, filters),
+                shown=len(view.listings),
+                total=len(outcome.listings),
+            )
+        )
     failed = outcome.failed_sources
     if failed:
         lines.append(t("partial_note", sources=", ".join(source_label(s.name) for s in failed)))
@@ -149,12 +163,19 @@ def _card(t: Texts, number: int, listing: Listing, title_limit: int) -> str:
         if listing.currency and listing.currency.upper() != "EUR" and listing.price_amount:
             price_text += f" ({listing.price_amount:,.0f} {escape(listing.currency.upper())})"
     city_text = t.city(listing.city.value)
-    posted = t("card_posted", date=listing.posted_at.strftime("%d.%m.%Y"))
+    approx = "~" if listing.source in APPROXIMATE_DATE_SOURCES else ""
+    posted = t("card_posted", date=approx + listing.posted_at.strftime("%d.%m.%Y"))
     meta = f"{price_text} · {city_text} · {source_label(listing.source)} · {posted}"
     return f"{number}. {_link(listing.url, listing.title, title_limit)}\n    {meta}"
 
 
-def format_results(t: Texts, outcome: SearchOutcome, view: ResultView, page: int) -> str:
+def format_results(
+    t: Texts,
+    outcome: SearchOutcome,
+    view: ResultView,
+    page: int,
+    filters: Filters | None = None,
+) -> str:
     """Header + stats + best deals + the cards of `page` (0-based), within Telegram's limit."""
     total = len(view.listings)
     page = clamp_page(page, total)
@@ -163,7 +184,7 @@ def format_results(t: Texts, outcome: SearchOutcome, view: ResultView, page: int
     budget = TELEGRAM_MESSAGE_LIMIT - _SAFETY_MARGIN
 
     def compose(title_limit: int, card_count: int) -> str:
-        sections = ["\n".join(_header(t, outcome, view)), "\n".join(_stats(t, view))]
+        sections = ["\n".join(_header(t, outcome, view, filters)), "\n".join(_stats(t, view))]
         deals = _deals(t, view.best_deals, title_limit)
         if deals:
             sections.append("\n".join(deals))
@@ -204,3 +225,61 @@ def format_empty(t: Texts, outcome: SearchOutcome) -> str:
     if failed:
         lines.append(t("partial_note", sources=", ".join(source_label(s.name) for s in failed)))
     return "\n\n".join(lines)
+
+
+# --- filters ------------------------------------------------------------------------------
+
+
+def format_price_filter(t: Texts, filters: Filters) -> str:
+    low, high = filters.min_price, filters.max_price
+    if low is not None and high is not None:
+        return t("price_range", low=format_money(low), high=format_money(high))
+    if low is not None:
+        return t("price_from", low=format_money(low))
+    if high is not None:
+        return t("price_upto", high=format_money(high))
+    return t("price_any")
+
+
+def format_filters_summary(t: Texts, filters: Filters) -> str:
+    """Only the non-default parts, e.g. "from €100 · Cheapest · Bazaraki"."""
+    parts: list[str] = []
+    if filters.min_price is not None or filters.max_price is not None:
+        parts.append(format_price_filter(t, filters))
+    if filters.sort is not SortOrder.NEWEST:
+        parts.append(t(f"sort.{filters.sort.value}"))
+    if filters.source is not None:
+        parts.append(source_label(filters.source))
+    return " · ".join(parts)
+
+
+def format_filters_menu(
+    t: Texts, outcome: SearchOutcome, view: ResultView, filters: Filters
+) -> str:
+    source = source_label(filters.source) if filters.source else t("source.all")
+    return "\n".join(
+        [
+            t("filters_title"),
+            "",
+            t("filter_price", value=format_price_filter(t, filters)),
+            t("filter_sort", value=t(f"sort.{filters.sort.value}")),
+            t("filter_source", value=source),
+            "",
+            t("filters_matching", shown=len(view.listings), total=len(outcome.listings)),
+        ]
+    )
+
+
+def format_no_match(t: Texts, outcome: SearchOutcome, filters: Filters) -> str:
+    """Results exist, but the user's filters exclude all of them."""
+    return "\n\n".join(
+        [
+            t("no_match_filters", total=len(outcome.listings)),
+            t(
+                "filters_active",
+                summary=format_filters_summary(t, filters),
+                shown=0,
+                total=len(outcome.listings),
+            ),
+        ]
+    )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from aggregator.cache import Cache
@@ -13,6 +15,10 @@ class SearchSession(BaseModel):
     outcome: SearchOutcome
     filters: Filters = Field(default_factory=Filters)
     page: int = 0
+    # Set while the bot waits for the user to type a min/max price.
+    pending_price: Literal["min", "max"] | None = None
+    # The message showing the results/filters, so a typed price can update it in place.
+    anchor_message_id: int | None = None
 
 
 class SessionStore:

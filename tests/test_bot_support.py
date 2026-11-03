@@ -124,6 +124,22 @@ def test_card_shows_original_currency_and_missing_price() -> None:
     assert "without a price" in text
 
 
+def test_bazaraki_dates_are_marked_approximate_but_telegram_dates_are_not() -> None:
+    listings = [
+        make_listing("Bike A", source="bazaraki", external_id="a"),
+        make_listing("Bike B", source="telegram", external_id="b"),
+    ]
+    text = format_results(Texts("en"), outcome_for(listings), build_view(listings, Filters()), 0)
+    cards_text = text.split("Listings")[1]
+    meta_lines = {
+        "Bazaraki" if "Bazaraki" in line else "Telegram": line
+        for line in cards_text.splitlines()
+        if "posted " in line
+    }
+    assert "posted ~" in meta_lines["Bazaraki"]
+    assert "posted " in meta_lines["Telegram"] and "posted ~" not in meta_lines["Telegram"]
+
+
 def test_unreliable_stats_are_flagged() -> None:
     listings = [make_listing("Bike", price=100, external_id="a")]
     text = format_results(Texts("en"), outcome_for(listings), build_view(listings, Filters()), 0)
