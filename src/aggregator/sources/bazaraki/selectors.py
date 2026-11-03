@@ -1,7 +1,7 @@
 """Everything that knows about Bazaraki's page structure lives here.
 
 If the site changes, this is the only module that should need editing (plus the fixtures).
-See docs/research/bazaraki.md for how these were found.
+These were found by inspecting the live site (HTML and the embedded Next.js data) on 2026-11-03.
 
 Why the embedded payload and not the DOM: the grid view and the city-scoped list view use
 different card components (`CardGridDesktop` vs `BigAdCard`), but both pages embed the same

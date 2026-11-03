@@ -119,7 +119,6 @@ src/aggregator/
   bot/            handlers, keyboards, formatting, i18n (en/ru)
   db/             models, repositories, Alembic migrations
 tests/            pytest, no live network calls
-docs/             spec, progress notes, Bazaraki research
 ```
 
 ## Development
@@ -130,7 +129,15 @@ ruff check . && ruff format --check . && mypy && pytest     # same as: make chec
 ```
 
 Tests marked as DB tests are skipped unless `TEST_DATABASE_URL` is set. **They drop all tables in
-that database**, so use a throwaway one. CI sets this up with a Postgres container.
+that database**, so use a throwaway one. CI sets this up with a Postgres container. Locally,
+Compose has a disposable one on port 5433:
+
+```bash
+docker compose --profile test up -d postgres-test
+export TEST_DATABASE_URL=postgresql+asyncpg://aggregator:aggregator@localhost:5433/aggregator_test
+pytest                                   # PowerShell: $env:TEST_DATABASE_URL = "..."
+docker compose --profile test down       # data was in tmpfs, nothing is kept
+```
 
 ### Adding a source
 

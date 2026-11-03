@@ -13,3 +13,6 @@ build/
 *.session
 *.session-journal
 data/
+
+# Local-only notes (spec, progress, research, test runbook): not published
+docs/
