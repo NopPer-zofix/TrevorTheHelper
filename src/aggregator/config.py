@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     bazaraki_cache_ttl_seconds: int = 300
     bazaraki_min_request_interval_seconds: float = 1.0
     bazaraki_max_pages: int = 3
+    # Distinct search terms sent to Bazaraki per user search (primary + variants).
+    bazaraki_max_terms: int = 2
+    bazaraki_user_agent: str = (
+        "TrevorTheHelperBot/0.1 (personal portfolio project; low-volume, cached)"
+    )
 
     # --- Listings / analytics ----------------------------------------------------------
     listing_max_age_days: int = 30
