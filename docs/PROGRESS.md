@@ -1,6 +1,6 @@
 # Progress and resume guide
 
-Spec: `docs/BUILD_PROMPT.md` (milestones in §9). Last updated: 2026-11-03 (milestone 7).
+Spec: `docs/BUILD_PROMPT.md` (milestones in §9). Last updated: 2026-11-03 (milestone 8; all milestones done).
 
 ## Resume in 30 seconds
 
@@ -25,7 +25,7 @@ Then tell Claude: "read docs/PROGRESS.md and continue with the next step".
 | 5 | Query expansion (Anthropic + rule-based fallback + DB cache) | Done (see below); `DbExpansionStore` SQL unverified until CI |
 | 6 | Search orchestrator, relevance filter, bot flow, service layer | Done (see below); never run against real Telegram/Bazaraki/DB yet |
 | 7 | Filters UI (min/max price, sort, source, reset) + polish | Done (see below) |
-| 8 | README (Mermaid diagram, setup, config table, ToS note, roadmap) | Not started |
+| 8 | README (Mermaid diagram, setup, config table, ToS note, roadmap) | Done (README.md; commands checked against code/compose/Makefile, not executed) |
 
 ### Milestone 7: status
 
