@@ -15,3 +15,5 @@ class Services:
     search: SearchService
     sessions: SessionStore
     source_names: list[str]
+    #: Whether the results message has the "Best deals" block (config: SHOW_BEST_DEALS).
+    show_best_deals: bool = True

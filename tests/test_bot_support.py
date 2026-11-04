@@ -153,6 +153,27 @@ def test_page_size_is_five() -> None:
     assert text.count("<a ") == PAGE_SIZE
 
 
+def test_best_deals_block_can_be_hidden() -> None:
+    prices = [100, 100, 100, 100, 100, 100, 30]  # one clear bargain among 7 priced listings
+    listings = [
+        make_listing(f"Bike {i}", price=p, external_id=f"{i}") for i, p in enumerate(prices)
+    ]
+    outcome = outcome_for(listings)
+    view = build_view(listings, Filters())
+    assert view.best_deals  # the data really does produce a deal
+
+    shown = format_results(Texts("en"), outcome, view, 0)
+    hidden = format_results(Texts("en"), outcome, view, 0, show_deals=False)
+    assert "Best deals" in shown
+    assert "Best deals" not in hidden
+    assert "Median" in hidden and "Listings" in hidden  # the rest of the message is unchanged
+
+
+def test_best_deals_are_off_by_default_in_settings() -> None:
+    assert settings().show_best_deals is False
+    assert settings(show_best_deals=True).show_best_deals is True
+
+
 def test_format_empty_distinguishes_total_failure_from_no_matches() -> None:
     failed = SearchOutcome(
         query=ExpandedQuery(original="x", normalized="x"),

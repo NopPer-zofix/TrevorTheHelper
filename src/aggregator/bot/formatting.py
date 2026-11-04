@@ -175,6 +175,7 @@ def format_results(
     view: ResultView,
     page: int,
     filters: Filters | None = None,
+    show_deals: bool = True,
 ) -> str:
     """Header + stats + best deals + the cards of `page` (0-based), within Telegram's limit."""
     total = len(view.listings)
@@ -185,7 +186,7 @@ def format_results(
 
     def compose(title_limit: int, card_count: int) -> str:
         sections = ["\n".join(_header(t, outcome, view, filters)), "\n".join(_stats(t, view))]
-        deals = _deals(t, view.best_deals, title_limit)
+        deals = _deals(t, view.best_deals, title_limit) if show_deals else []
         if deals:
             sections.append("\n".join(deals))
         if card_count:

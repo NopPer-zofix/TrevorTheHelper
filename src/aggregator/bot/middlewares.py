@@ -6,12 +6,15 @@ import math
 from collections.abc import Awaitable, Callable, Collection
 from typing import Any
 
+import structlog
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject, User
 
 from aggregator.bot.i18n import Texts
 from aggregator.services.ratelimit import SlidingWindowRateLimiter
 from aggregator.services.users import guess_language
+
+log = structlog.get_logger()
 
 Handler = Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]]
 
@@ -39,6 +42,12 @@ class AccessMiddleware(BaseMiddleware):
         user: User | None = data.get("event_from_user")
         if user is not None and user.id in self._allowed:
             return await handler(event, data)
+        # The id is logged so an owner who mistyped ALLOWED_USER_IDS can find the right one.
+        log.warning(
+            "access.denied",
+            user_id=user.id if user else None,
+            username=user.username if user else None,
+        )
         await _reply(event, _texts_for(user)("not_allowed"))
         return None
 

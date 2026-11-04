@@ -15,6 +15,7 @@ from aiogram.client.session.base import BaseSession
 from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage, TelegramMethod
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
 
+from aggregator.bot import handlers
 from aggregator.bot.context import Services
 from aggregator.bot.runner import build_dispatcher, create_bot
 from aggregator.cache import InMemoryTTLCache
@@ -229,6 +230,26 @@ async def test_search_edits_one_message_and_shows_stats_deals_and_cards(
     assert harness.session.buttons(final) == ["noop", "pg:1", "f:menu"]
     assert re.search(r'<a href="https://example\.test/[^"]+">', text)
     assert len(text) <= 4096
+
+
+async def test_handlers_pass_the_best_deals_flag_to_the_message(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The handler must forward `services.show_best_deals` (unit tests cover the formatting)."""
+    seen: list[bool] = []
+    real = handlers.format_results
+
+    def spy(*args: Any, **kwargs: Any) -> str:
+        seen.append(kwargs["show_deals"])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(handlers, "format_results", spy)
+    await onboard(harness)
+    harness.services.show_best_deals = False
+    await harness.say("iphone 13")
+    harness.services.show_best_deals = True
+    await harness.tap("pg:1")
+    assert seen == [False, True]
 
 
 async def test_progress_message_is_updated_as_sources_respond(harness: Harness) -> None:

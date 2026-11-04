@@ -56,6 +56,7 @@ async def main() -> None:
             settings.result_session_ttl_seconds,
         ),
         source_names=registry.names,
+        show_best_deals=settings.show_best_deals,
     )
 
     async def db_healthy() -> bool:

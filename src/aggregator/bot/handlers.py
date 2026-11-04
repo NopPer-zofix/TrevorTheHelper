@@ -63,7 +63,9 @@ def render_results(t: Texts, services: Services, session: SearchSession) -> Scre
         keyboard = keyboards.results_keyboard(t, 0, 1, filters_active=True)
         return format_no_match(t, session.outcome, filters), keyboard
     page = clamp_page(session.page, len(view.listings))
-    text = format_results(t, session.outcome, view, page, filters)
+    text = format_results(
+        t, session.outcome, view, page, filters, show_deals=services.show_best_deals
+    )
     keyboard = keyboards.results_keyboard(
         t, page, page_count(len(view.listings)), filters_active=not filters.is_default
     )

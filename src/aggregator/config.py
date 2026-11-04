@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # --- Listings / analytics ----------------------------------------------------------
     listing_max_age_days: int = 30
     best_deal_ratio: float = 0.75
+    # The "Best deals" block in the results message. Off until relevance tuning is good enough
+    # that the median it is based on is not polluted by accessories and parts.
+    show_best_deals: bool = False
     # Listings scoring below this against the expanded query are dropped (0..1).
     relevance_min_score: float = 0.75
     max_query_length: int = 100
