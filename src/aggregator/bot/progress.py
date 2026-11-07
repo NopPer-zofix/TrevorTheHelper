@@ -18,7 +18,13 @@ log = structlog.get_logger()
 
 class ProgressMessage:
     def __init__(
-        self, origin: Message, t: Texts, query: str, city: City, source_names: list[str]
+        self,
+        origin: Message,
+        t: Texts,
+        query: str,
+        city: City,
+        source_names: list[str],
+        existing: Message | None = None,
     ) -> None:
         self._origin = origin
         self._t = t
@@ -26,12 +32,20 @@ class ProgressMessage:
         self._city = city
         self._source_names = source_names
         self._done: dict[str, SourceStatus] = {}
-        self._message: Message | None = None
+        # `existing`: reuse a message already on screen (e.g. the category question) instead of
+        # sending a new one.
+        self._message: Message | None = existing
 
     def _text(self) -> str:
         return format_progress(self._t, self._query, self._city, self._source_names, self._done)
 
     async def start(self) -> None:
+        if self._message is not None:
+            try:
+                await self._message.edit_text(self._text(), reply_markup=None)
+            except TelegramAPIError:
+                log.debug("progress.reuse_failed", exc_info=True)
+            return
         self._message = await self._origin.answer(self._text())
 
     async def on_status(self, status: SourceStatus) -> None:

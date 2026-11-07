@@ -45,10 +45,14 @@ class SearchOrchestrator:
         query: ExpandedQuery,
         city: City,
         on_progress: ProgressCallback | None = None,
+        category: str | None = None,
     ) -> SearchOutcome:
         started = self._clock()
         results = await asyncio.gather(
-            *(self._run_source(source, query, city, on_progress) for source in self._sources)
+            *(
+                self._run_source(source, query, city, on_progress, category)
+                for source in self._sources
+            )
         )
 
         merged: dict[tuple[str, str], Listing] = {}
@@ -59,6 +63,7 @@ class SearchOrchestrator:
         return SearchOutcome(
             query=query,
             city=city,
+            category=category,
             listings=list(merged.values()),
             statuses=[status for status, _ in results],
             duration_ms=self._elapsed_ms(started),
@@ -70,14 +75,15 @@ class SearchOrchestrator:
         query: ExpandedQuery,
         city: City,
         on_progress: ProgressCallback | None,
+        category: str | None = None,
     ) -> tuple[SourceStatus, list[Listing]]:
         started = self._clock()
         listings: list[Listing] = []
         try:
-            # Sources get default filters: the user's filters are applied afterwards on the
-            # merged set so they can change without re-fetching.
+            # Sources get default filters plus the category scope: the user's filters are applied
+            # afterwards on the merged set so they can change without re-fetching.
             fetched = await asyncio.wait_for(
-                source.search(query, city, Filters()), timeout=self._timeout
+                source.search(query, city, Filters(category=category)), timeout=self._timeout
             )
         except asyncio.CancelledError:
             raise
@@ -99,6 +105,16 @@ class SearchOrchestrator:
             log.warning("search.source_failed", source=source.name, error=status.error)
         else:
             in_city = [li for li in fetched if city_matches(li.city, city)]
+            if category is not None:
+                # Safety net for sources that ignore the scope. A listing with no category of its
+                # own (e.g. a Telegram post) cannot be judged, so it is kept.
+                in_city = [
+                    li
+                    for li in in_city
+                    if li.category is None
+                    or li.category == category
+                    or li.category.startswith(category + "/")
+                ]
             listings = filter_relevant(in_city, query, self._min_relevance)
             status = SourceStatus(
                 name=source.name,

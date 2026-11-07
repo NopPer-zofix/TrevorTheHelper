@@ -203,3 +203,41 @@ def test_every_new_text_exists_in_both_languages(lang: str) -> None:
     t = Texts(lang)
     for key in ("unusual_hidden", "unusual_mixed", "unusual_shown", "filter_unusual"):
         assert t(key)
+
+
+# --- results that span several kinds of product ---------------------------------------------
+
+
+def categorised(prices: list[float], category: str, prefix: str):
+    return [
+        make_listing(f"{prefix} {i}", price=p, external_id=f"{prefix}-{i}", category=category)
+        for i, p in enumerate(prices)
+    ]
+
+
+def test_rentals_next_to_sales_are_never_hidden_as_unusual() -> None:
+    rent = categorised(
+        [1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200],
+        "real-estate-to-rent/apartments-flats",
+        "r",
+    )
+    sale = categorised(
+        [210_000, 220_000, 230_000, 240_000], "real-estate-for-sale/apartments-flats", "s"
+    )
+    view = build_view([*rent, *sale], Filters())
+    assert len(view.listings) == 12  # nothing hidden: they are different kinds, not outliers
+    assert view.unusual.mixed and view.unusual.count == 0
+
+
+def test_a_stray_ad_from_another_category_does_not_switch_the_hiding_off() -> None:
+    phones = categorised([*PHONES, 4, 5], "telephones/mobile-phones", "p")
+    stray = categorised([900], "electronics-and-appliances/solar", "x")
+    view = build_view([*phones, *stray], Filters())
+    assert view.unusual.low_count == 2 and not view.unusual.mixed
+
+
+def test_listings_without_a_category_use_the_price_rule_as_before() -> None:
+    view = build_view(
+        listings_with([*PHONES, *JUNK_PRICES]), Filters()
+    )  # Telegram-like: no category
+    assert view.unusual.low_count == 3

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
 
 import structlog
 
 from aggregator.cache import Cache
+from aggregator.domain.categories import is_known_category
 from aggregator.domain.cities import City
 from aggregator.domain.models import ExpandedQuery, Filters, Listing
 from aggregator.sources.base import SourceError, search_terms
@@ -41,13 +43,18 @@ class BazarakiSource:
     async def search(
         self, query: ExpandedQuery, city: City | None, filters: Filters
     ) -> list[Listing]:
-        # `filters` are applied by the orchestrator on the merged result set.
+        # Price/sort/source filters are applied by the orchestrator on the merged result set; only
+        # the category scope changes what is fetched.
         scope = city if city not in (None, City.ALL_CYPRUS) else None
+        category = filters.category
+        if category is not None and not is_known_category(category):
+            log.warning("bazaraki.unknown_category", category=category)
+            category = None  # never put an unvetted string into a URL path
         merged: dict[str, Listing] = {}
         terms = search_terms(query, self._max_terms)
         for index, term in enumerate(terms):
             try:
-                found = await self._search_term(term, scope)
+                found = await self._search_term(term, scope, category)
             except SourceError:
                 if index == 0 or not merged:
                     raise
@@ -57,18 +64,41 @@ class BazarakiSource:
                 merged.setdefault(listing.external_id, listing)
         return list(merged.values())
 
-    async def _search_term(self, term: str, scope: City | None) -> list[Listing]:
-        key = f"{SOURCE_NAME}:{scope.value if scope else 'all'}:{term.lower()}"
+    async def explore_categories(self, query: ExpandedQuery, city: City | None) -> dict[str, int]:
+        """Category counts of the first results page of an unscoped search (one request, cached).
+
+        A single page is enough to see whether the results are one thing (phones) or several
+        ("3 bedroom apartment" is for sale, to rent, houses, flats...).
+        """
+        scope = city if city not in (None, City.ALL_CYPRUS) else None
+        term = search_terms(query, 1)[0]
+        key = f"{SOURCE_NAME}:explore:{scope.value if scope else 'all'}:{term.lower()}"
+        listings = await self._cache.get(key)
+        if listings is None:
+            html = await self._client.get_html(
+                search_path(scope.value if scope else None), {"q": term}
+            )
+            listings = parse_search_page(
+                html, now=self._now(), page=1, searched_city=scope
+            ).listings
+            await self._cache.set(key, listings, self._ttl)
+        return dict(Counter(li.category for li in listings if li.category))
+
+    async def _search_term(
+        self, term: str, scope: City | None, category: str | None = None
+    ) -> list[Listing]:
+        key = f"{SOURCE_NAME}:{scope.value if scope else 'all'}:{category or '-'}:{term.lower()}"
         cached = await self._cache.get(key)
         if cached is not None:
             return cached
 
         listings: list[Listing] = []
+        path = search_path(scope.value if scope else None, category)
         for page in range(1, self._max_pages + 1):
             params: dict[str, str | int] = {"q": term}
             if page > 1:
                 params["page"] = page
-            html = await self._client.get_html(search_path(scope.value if scope else None), params)
+            html = await self._client.get_html(path, params)
             parsed = parse_search_page(html, now=self._now(), page=page, searched_city=scope)
             listings.extend(parsed.listings)
             if not parsed.listings or not parsed.has_next_page:

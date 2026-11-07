@@ -63,6 +63,8 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 "src/aggregator/query/llm.py" = ["RUF001"]
 "src/aggregator/search/relevance.py" = ["RUF001"]
 "src/aggregator/bot/i18n.py" = ["RUF001"]
+"src/aggregator/domain/category_data.py" = ["RUF001"]
+"src/aggregator/domain/categories.py" = ["RUF001", "RUF002"]
 "tests/*" = ["RUF001", "RUF003"]
 
 [tool.mypy]

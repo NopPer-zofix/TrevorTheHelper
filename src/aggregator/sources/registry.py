@@ -12,7 +12,7 @@ from aggregator.cache import InMemoryTTLCache
 from aggregator.config import Settings
 from aggregator.db.repositories import ListingRepository
 from aggregator.domain.models import Listing
-from aggregator.sources.base import ListingSource
+from aggregator.sources.base import CategoryExplorer, ListingSource
 from aggregator.sources.bazaraki.client import BazarakiClient
 from aggregator.sources.bazaraki.source import BazarakiSource
 from aggregator.sources.facebook.source import FacebookMarketplaceSource
@@ -31,6 +31,11 @@ class SourceRegistry:
     @property
     def names(self) -> list[str]:
         return [source.name for source in self.sources]
+
+    @property
+    def explorers(self) -> list[CategoryExplorer]:
+        """Sources that can tell which categories a query's results fall in."""
+        return [source for source in self.sources if isinstance(source, CategoryExplorer)]
 
     async def aclose(self) -> None:
         for close in self._closers:

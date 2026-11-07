@@ -26,6 +26,9 @@ class Listing(BaseModel):
     currency: str | None = None
     city: City = City.UNKNOWN
     posted_at: datetime
+    # Source category path, reduced to the catalog (e.g. "telephones/mobile-phones"). None when the
+    # source has no categories (Telegram posts) or the advert's category is unknown.
+    category: str | None = None
 
     @property
     def price_eur(self) -> Decimal | None:
@@ -69,10 +72,14 @@ class Filters(BaseModel):
     # Listings priced far outside the main group (see analytics/price_cases.py) are hidden unless
     # this is True. They never count towards the statistics either way.
     show_unusual_prices: bool = False
+    # A source-side category scope ("real-estate-to-rent/apartments-flats"). It is set by the
+    # search itself when the user answers a category question, never by the Filters menu, and only
+    # sources (and the orchestrator's safety check) look at it. It is not a "user filter".
+    category: str | None = None
 
     @property
     def is_default(self) -> bool:
-        return self == Filters()
+        return self.model_copy(update={"category": None}) == Filters()
 
 
 class PriceStats(BaseModel):

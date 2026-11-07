@@ -42,3 +42,18 @@ class ListingSource(Protocol):
         orchestrator re-applies price/sort/source filters on the merged result set.
         """
         ...
+
+
+@runtime_checkable
+class CategoryExplorer(Protocol):
+    """Optional capability of a source: tell which of its categories a query's results fall in.
+
+    The bot uses it to decide whether to ask the user a clarifying question ("rent or buy?")
+    before searching. Sources without categories (Telegram) simply do not implement it.
+    """
+
+    name: str
+
+    async def explore_categories(self, query: ExpandedQuery, city: City | None) -> dict[str, int]:
+        """Category path -> number of sampled results, e.g. {"telephones/mobile-phones": 41}."""
+        ...

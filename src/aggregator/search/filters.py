@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 
-from aggregator.analytics.price_cases import PriceCase, find_price_cuts
+from aggregator.analytics.price_cases import PriceCase, PriceCuts, find_price_cuts
 from aggregator.analytics.stats import compute_stats, find_best_deals
 from aggregator.domain.models import Filters, Listing, SortOrder
 from aggregator.search.models import ResultView, UnusualPrices
@@ -55,6 +55,21 @@ def apply_filters(listings: Sequence[Listing], filters: Filters) -> list[Listing
     return sort_listings([li for li in listings if _passes(li, filters)], filters.sort)
 
 
+_SINGLE_CLASS_SHARE = 0.85  # one top-level category must hold this share to count as one product
+_MIN_CATEGORISED = 6
+
+
+def _spans_several_categories(listings: Sequence[Listing]) -> bool:
+    """True when the results are a real mix of kinds (rentals and sales, phones and bikes).
+
+    The price cases assume one kind of product, so for such a set a "far from the others" price
+    says nothing: the minority group is just another kind. A stray ad or two does not count.
+    """
+    tops = Counter(li.category.split("/")[0] for li in listings if li.category)
+    total = sum(tops.values())
+    return total >= _MIN_CATEGORISED and max(tops.values()) / total < _SINGLE_CLASS_SHARE
+
+
 def build_view(
     listings: Sequence[Listing], filters: Filters, best_deal_ratio: float = 0.75
 ) -> ResultView:
@@ -64,7 +79,10 @@ def build_view(
     boundaries do not move when the user narrows the price range) are hidden unless the user asked
     to see them, and are always left out of the statistics and the best deals.
     """
-    cuts = find_price_cuts([p for li in listings if (p := li.price_eur) is not None])
+    if _spans_several_categories(listings):
+        cuts = PriceCuts(mixed=True)  # rentals next to sales: no price is "unusual" for the set
+    else:
+        cuts = find_price_cuts([p for li in listings if (p := li.price_eur) is not None])
     passing = [li for li in listings if _passes(li, filters)]
 
     normal: list[Listing] = []

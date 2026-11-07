@@ -31,6 +31,9 @@ F_CURRENCY = "currency"
 F_PUBLISHED = "published"  # relative: "3 days ago", "Yesterday"
 F_URL = "url"  # "/adv/<id>_<slug>/"
 F_LOCATION = "location"  # "Limassol — Limassol Marina"
+F_RUBRIC = "rubric"  # {"slug": "iphone-13", "ancestors": [{"slug": "telephones"}, ...]}
+F_ANCESTORS = "ancestors"
+F_SLUG = "slug"
 
 # --- Pagination (links rendered in the HTML, `...&page=N`) ----------------------------------------
 PAGE_LINK_RE = re.compile(r"[?&;]page=(\d+)")
@@ -46,6 +49,11 @@ DISTRICT_SLUGS: dict[str, str] = {
 }
 
 
-def search_path(city_value: str | None) -> str:
+def search_path(city_value: str | None, category: str | None = None) -> str:
+    """`/search/[<district>/]`, or `/<category>/[<district>/]` to search inside a category.
+
+    `category` must be a known catalog path (the caller checks), so no user text ends up in the URL.
+    """
     slug = DISTRICT_SLUGS.get(city_value or "")
-    return f"/search/{slug}/" if slug else "/search/"
+    base = f"/{category.strip('/')}/" if category else "/search/"
+    return f"{base}{slug}/" if slug else base

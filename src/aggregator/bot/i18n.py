@@ -46,6 +46,15 @@ EN: dict[str, str] = {
     "stats_unreliable": "⚠️ Only {count} priced listing(s) — statistics are unreliable.",
     "stats_none": "No prices in these listings.",
     "stats_unpriced": "{count} listing(s) without a price are not counted.",
+    "category_question": (
+        "🗂 <b>What are you looking for?</b>\n"
+        "“{query}” matches several kinds of listings. Pick one for cleaner results.{where}"
+    ),
+    "category_where": "\nIn: <b>{label}</b>",
+    "category_option": "{label} ({count})",
+    "btn_any_category": "🔎 Any category",
+    "category_line": "🗂 Category: {category}",
+    "category_expired": "That question has expired. Please send your search again.",
     "unusual_hidden": (
         "🚫 {count} listing(s) with unusual prices hidden ({detail}): likely parts, accessories "
         "or typos. You can show them in Filters."
@@ -156,6 +165,16 @@ RU: dict[str, str] = {
     "stats_unreliable": "⚠️ Объявлений с ценой всего {count} — статистика ненадёжна.",
     "stats_none": "В этих объявлениях нет цен.",
     "stats_unpriced": "Объявления без цены ({count}) не учитываются.",
+    "category_question": (
+        "🗂 <b>Что вы ищете?</b>\n"
+        "«{query}» подходит к разным видам объявлений. "
+        "Выберите нужный, чтобы результаты были точнее.{where}"
+    ),
+    "category_where": "\nВ разделе: <b>{label}</b>",
+    "category_option": "{label} ({count})",
+    "btn_any_category": "🔎 Любая категория",
+    "category_line": "🗂 Категория: {category}",
+    "category_expired": "Этот вопрос устарел. Отправьте запрос ещё раз.",
     "unusual_hidden": (
         "🚫 Скрыто объявлений с необычной ценой: {count} ({detail}). Скорее всего, это запчасти, "
         "аксессуары или опечатки. Показать их можно в фильтрах."

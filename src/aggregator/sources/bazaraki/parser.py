@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from aggregator.domain.categories import normalize_path
 from aggregator.domain.cities import City, detect_city
 from aggregator.domain.models import Listing
 from aggregator.domain.pricing import parse_price
@@ -75,6 +76,18 @@ def extract_adverts(html: str) -> list[dict[str, Any]] | None:
     return None
 
 
+def advert_category(advert: dict[str, Any]) -> str | None:
+    """The advert's category path reduced to the catalog, e.g. "telephones/mobile-phones"."""
+    rubric = advert.get(sel.F_RUBRIC)
+    if not isinstance(rubric, dict):
+        return None
+    ancestors = rubric.get(sel.F_ANCESTORS)
+    if not isinstance(ancestors, list):
+        return None
+    slugs = [a.get(sel.F_SLUG) for a in ancestors if isinstance(a, dict)]
+    return normalize_path("/".join(s for s in slugs if isinstance(s, str) and s))
+
+
 def _to_listing(
     advert: dict[str, Any], *, now: datetime, scoped_city: City | None
 ) -> Listing | None:
@@ -104,6 +117,7 @@ def _to_listing(
         currency=currency,
         city=city,
         posted_at=parse_published(advert.get(sel.F_PUBLISHED), now),
+        category=advert_category(advert),
     )
 
 

@@ -7,15 +7,18 @@ from collections.abc import Sequence
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from aggregator.bot.formatting import format_money, source_label
+from aggregator.bot.formatting import format_money, option_label, source_label
 from aggregator.bot.i18n import Texts
 from aggregator.domain.cities import SELECTABLE_CITIES
 from aggregator.domain.models import Filters, SortOrder
+from aggregator.search.category_choice import CategoryOption
 
 LANG_PREFIX = "lang:"
 CITY_PREFIX = "city:"
 PAGE_PREFIX = "pg:"
 FILTER_PREFIX = "f:"
+CATEGORY_PREFIX = "c:"
+ANY_CATEGORY = "any"
 NOOP = "noop"
 
 F_MENU = "f:menu"
@@ -126,6 +129,29 @@ def filters_keyboard(t: Texts, filters: Filters, sources: Sequence[str]) -> Inli
     return InlineKeyboardMarkup(
         inline_keyboard=[sort_row, source_row, price_row, unusual_row, last_row]
     )
+
+
+def category_keyboard(
+    t: Texts, options: Sequence[CategoryOption], prefix: str | None
+) -> InlineKeyboardMarkup:
+    """One button per option (`c:<index>`, indexes into the stored pending options), then
+    "Any category" (`c:any`). Indexes, not paths, keep callback data short and unforgeable."""
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=option_label(t, option, prefix), callback_data=f"{CATEGORY_PREFIX}{i}"
+            )
+        ]
+        for i, option in enumerate(options)
+    ]
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=t("btn_any_category"), callback_data=f"{CATEGORY_PREFIX}{ANY_CATEGORY}"
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def price_prompt_keyboard(t: Texts) -> InlineKeyboardMarkup:

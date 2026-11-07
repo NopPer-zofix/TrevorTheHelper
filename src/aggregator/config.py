@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     max_query_length: int = 100
     # How long a user can page through / re-filter the last result set.
     result_session_ttl_seconds: int = 3600
+    # How long an unanswered category question ("rent or buy?") stays valid.
+    pending_question_ttl_seconds: int = 900
 
     # --- Rate limiting / quota ---------------------------------------------------------
     rate_limit_enabled: bool = False

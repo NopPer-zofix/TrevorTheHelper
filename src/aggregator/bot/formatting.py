@@ -8,8 +8,10 @@ from decimal import Decimal
 from html import escape
 
 from aggregator.bot.i18n import Texts
+from aggregator.domain.categories import category_label, short_label
 from aggregator.domain.cities import City
 from aggregator.domain.models import BestDeal, Filters, Listing, SortOrder
+from aggregator.search.category_choice import CategoryOption
 from aggregator.search.models import ResultView, SearchOutcome, SourceStatus
 
 PAGE_SIZE = 5
@@ -87,6 +89,10 @@ def _header(
             city=t.city(outcome.city.value),
         )
     ]
+    if outcome.category:
+        lines.append(
+            t("category_line", category=escape(category_label(outcome.category, t.language)))
+        )
     parts = [
         t("source_unavailable", source=source_label(s.name))
         if not s.ok
@@ -312,3 +318,19 @@ def format_no_match(t: Texts, outcome: SearchOutcome, filters: Filters) -> str:
             ),
         ]
     )
+
+
+# --- category question --------------------------------------------------------------------
+
+
+def option_label(t: Texts, option: CategoryOption, prefix: str | None) -> str:
+    """Button text: the full name at the top level, only the last level below a chosen parent."""
+    name = (
+        short_label(option.path, t.language) if prefix else category_label(option.path, t.language)
+    )
+    return t("category_option", label=name, count=option.count)
+
+
+def format_category_question(t: Texts, query: str, prefix: str | None) -> str:
+    where = t("category_where", label=escape(category_label(prefix, t.language))) if prefix else ""
+    return t("category_question", query=escape(query), where=where)

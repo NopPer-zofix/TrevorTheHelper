@@ -15,6 +15,7 @@ from aggregator.bot import keyboards
 from aggregator.bot.context import Services
 from aggregator.bot.formatting import (
     clamp_page,
+    format_category_question,
     format_empty,
     format_filters_menu,
     format_no_match,
@@ -24,7 +25,8 @@ from aggregator.bot.formatting import (
 from aggregator.bot.i18n import Texts
 from aggregator.bot.progress import ProgressMessage
 from aggregator.domain.cities import City
-from aggregator.domain.models import Filters
+from aggregator.domain.models import ExpandedQuery, Filters
+from aggregator.search.category_choice import Ask, Decision, Resolved
 from aggregator.services.filters import (
     FilterError,
     parse_price_input,
@@ -33,6 +35,7 @@ from aggregator.services.filters import (
     set_source,
     toggle_unusual_prices,
 )
+from aggregator.services.pending import PendingSearch
 from aggregator.services.quota import check_quota
 from aggregator.services.search_service import InvalidQueryError
 from aggregator.services.sessions import SearchSession
@@ -167,11 +170,59 @@ async def on_search(message: Message, services: Services) -> None:
         await message.answer(t("need_city"), reply_markup=keyboards.city_keyboard(t))
         return
 
+    await services.pending.clear(user.telegram_id)  # a new search replaces an unanswered question
     progress = ProgressMessage(message, t, query, user.city, services.source_names)
     await progress.start()
+
+    # First look at which categories the results fall in: that may need a question to the user.
+    plan = None
     try:
-        outcome = await services.search.search(user, query, progress.on_status)
+        plan = await services.search.plan_category(user, query)
     except InvalidQueryError as exc:  # raced with a config change; same handling as above
+        await progress.finish(t(f"invalid_{exc.reason}", max=services.search.max_query_length))
+        return
+    except Exception:  # never let the category step block a search
+        log.exception("search.plan_failed")
+
+    if plan is not None and isinstance(plan.decision, Ask):
+        pending = PendingSearch(
+            text=query,
+            query=plan.query,
+            counts=dict(plan.counts),
+            intent=plan.intent,
+            prefix=plan.decision.prefix,
+            options=[o.path for o in plan.decision.options],
+        )
+        await services.pending.save(user.telegram_id, pending)
+        await progress.finish(
+            format_category_question(t, query, plan.decision.prefix),
+            keyboards.category_keyboard(t, plan.decision.options, plan.decision.prefix),
+        )
+        return
+
+    category = (
+        plan.decision.path if plan is not None and isinstance(plan.decision, Resolved) else None
+    )
+    await _search_and_show(
+        progress, user, services, t, query, category, plan.query if plan is not None else None
+    )
+
+
+async def _search_and_show(
+    progress: ProgressMessage,
+    user: UserProfile,
+    services: Services,
+    t: Texts,
+    text: str,
+    category: str | None,
+    expanded: ExpandedQuery | None,
+) -> None:
+    """Run the search (optionally inside a category) and replace the progress message with it."""
+    try:
+        outcome = await services.search.search(
+            user, text, progress.on_status, category=category, query=expanded
+        )
+    except InvalidQueryError as exc:
         await progress.finish(t(f"invalid_{exc.reason}", max=services.search.max_query_length))
         return
     except Exception:
@@ -181,8 +232,59 @@ async def on_search(message: Message, services: Services) -> None:
 
     session = SearchSession(outcome=outcome)
     await services.sessions.save(user.telegram_id, session)
-    text, markup = render_results(t, services, session)
-    await progress.finish(text, markup)
+    text_out, markup = render_results(t, services, session)
+    await progress.finish(text_out, markup)
+
+
+async def on_category(callback: CallbackQuery, services: Services) -> None:
+    """The user answered a category question (`c:<option index>` or `c:any`)."""
+    user = await _user_for(callback, services)
+    if user is None or not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+    t = Texts(user.language)
+    pending = await services.pending.get(user.telegram_id)
+    if pending is None:
+        await callback.answer(t("category_expired"), show_alert=True)
+        return
+
+    raw = (callback.data or "").removeprefix(keyboards.CATEGORY_PREFIX)
+    decision: Decision
+    if raw == keyboards.ANY_CATEGORY:
+        decision = Resolved(None)
+    else:
+        try:
+            chosen = pending.options[int(raw)]
+        except (ValueError, IndexError):  # forged or stale callback data
+            await callback.answer()
+            return
+        decision = services.search.next_category_step(pending.counts, chosen, pending.intent)
+    await callback.answer()
+
+    if isinstance(decision, Ask):  # the next level of the tree needs a question as well
+        pending.prefix = decision.prefix
+        pending.options = [o.path for o in decision.options]
+        await services.pending.save(user.telegram_id, pending)
+        try:
+            await callback.message.edit_text(
+                format_category_question(t, pending.text, decision.prefix),
+                reply_markup=keyboards.category_keyboard(t, decision.options, decision.prefix),
+            )
+        except TelegramAPIError:
+            log.debug("category.edit_skipped", exc_info=True)
+        return
+
+    await services.pending.clear(user.telegram_id)
+    progress = ProgressMessage(
+        callback.message,
+        t,
+        pending.text,
+        user.city or City.ALL_CYPRUS,
+        services.source_names,
+        existing=callback.message,
+    )
+    await progress.start()
+    await _search_and_show(progress, user, services, t, pending.text, decision.path, pending.query)
 
 
 async def on_page(callback: CallbackQuery, services: Services) -> None:
@@ -344,6 +446,7 @@ def build_router() -> Router:
     )  # before on_search: it may claim a number
     router.message.register(on_search, F.text & ~F.text.startswith("/"))
     router.message.register(on_non_text, F.chat.type == "private", ~F.text)
+    router.callback_query.register(on_category, F.data.startswith(keyboards.CATEGORY_PREFIX))
     router.callback_query.register(on_page, F.data.startswith(keyboards.PAGE_PREFIX))
     router.callback_query.register(on_filter, F.data.startswith(keyboards.FILTER_PREFIX))
     router.callback_query.register(on_noop, F.data == keyboards.NOOP)

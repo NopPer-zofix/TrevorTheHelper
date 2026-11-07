@@ -23,10 +23,11 @@ from aggregator.config import Settings
 from aggregator.domain.cities import City
 from aggregator.query import QueryExpander
 from aggregator.search.orchestrator import SearchOrchestrator
+from aggregator.services.pending import PendingSearch, PendingStore
 from aggregator.services.search_service import SearchService
 from aggregator.services.sessions import SearchSession, SessionStore
 from aggregator.services.users import InMemoryUserStore, UserService
-from aggregator.sources.base import SourceError
+from aggregator.sources.base import CategoryExplorer, SourceError
 from factories import make_listing
 from test_orchestrator import FakeSource
 
@@ -82,13 +83,16 @@ class Harness:
         self.bot = create_bot("123456:TEST-TOKEN", self.session)
         self.users = UserService(InMemoryUserStore())
         self.sessions = SessionStore(InMemoryTTLCache[SearchSession](), 3600)
+        self.pending = PendingStore(InMemoryTTLCache[PendingSearch](), 900)
         self.services = Services(
             users=self.users,
             search=SearchService(
                 QueryExpander(llm=None),
                 SearchOrchestrator(sources, source_timeout_seconds=1),
+                explorers=[s for s in sources if isinstance(s, CategoryExplorer)],
             ),
             sessions=self.sessions,
+            pending=self.pending,
             source_names=[s.name for s in sources],
         )
         self.dp: Dispatcher = build_dispatcher(self.services, settings)

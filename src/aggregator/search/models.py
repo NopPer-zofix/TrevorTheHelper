@@ -27,6 +27,7 @@ class SearchOutcome(BaseModel):
 
     query: ExpandedQuery
     city: City
+    category: str | None = None  # the category scope the user chose (None = all categories)
     listings: list[Listing] = Field(default_factory=list)
     statuses: list[SourceStatus] = Field(default_factory=list)
     duration_ms: int = 0

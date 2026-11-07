@@ -18,6 +18,7 @@ from aggregator.logging import configure_logging
 from aggregator.query.service import build_query_expander
 from aggregator.query.store import DbExpansionStore
 from aggregator.search.orchestrator import SearchOrchestrator
+from aggregator.services.pending import PendingSearch, PendingStore
 from aggregator.services.search_service import DbSearchLogStore, SearchService
 from aggregator.services.sessions import SearchSession, SessionStore
 from aggregator.services.users import DbUserStore, UserService
@@ -50,10 +51,16 @@ async def main() -> None:
             DbSearchLogStore(session_factory),
             best_deal_ratio=settings.best_deal_ratio,
             max_query_length=settings.max_query_length,
+            explorers=registry.explorers,
+            explore_timeout_seconds=settings.source_timeout_seconds,
         ),
         sessions=SessionStore(
             InMemoryTTLCache[SearchSession](max_entries=2048),
             settings.result_session_ttl_seconds,
+        ),
+        pending=PendingStore(
+            InMemoryTTLCache[PendingSearch](max_entries=2048),
+            settings.pending_question_ttl_seconds,
         ),
         source_names=registry.names,
         show_best_deals=settings.show_best_deals,
