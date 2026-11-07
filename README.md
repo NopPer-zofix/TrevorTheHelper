@@ -104,8 +104,12 @@ text into English and Russian variants, queries all sources in parallel with a t
 (a failing source is reported, the rest still answer), drops irrelevant listings, and computes stats
 with outliers removed. Stats are flagged unreliable under 3 priced listings; best deals need 5.
 
-Two things keep the results clean:
+Three things keep the results clean:
 
+- **English and Russian are one search.** A shared vocabulary (`domain/lexicon.py`) maps synonyms,
+  translations and word forms to one meaning, and room counts are normalised, so
+  "3-х комнатная квартира", "3-bedroom apartment" and "3 bed flat" return the same listings.
+  Bazaraki is searched with one English and one Russian phrase.
 - **Category questions (Bazaraki).** Before searching, the bot looks at which Bazaraki categories
   the results fall in. If it is clearly one thing ("iphone 13" is mobile phones) it searches inside
   that category. If it is a real mix, it asks: "3 bedroom apartment" gets *to rent or for sale?*,
@@ -174,6 +178,10 @@ The orchestrator, filters, stats and bot need no changes.
   or "mini" (a different product), nor a different storage size when both are stated; search for
   the variant you want. Part names leading a title ("Display apple iphone 13") are dropped. A
   multi-item post yields its first price only; a price without a currency is read as EUR.
+- **The vocabulary is hand-made.** Words missing from `domain/lexicon.py` are not translated, so
+  such a query only matches listings in the language it was typed in. A Russian "3-комнатная"
+  (rooms) is treated as equal to "3-bedroom" because Cyprus listings use it that way. An Anthropic
+  API key replaces the rule-based expansion with an LLM, which translates anything.
 - **Categories exist for Bazaraki only.** Telegram posts have none, so they are not narrowed by
   the category you pick (only by the text match). The category tree is a snapshot of Bazaraki's
   (captured 2026-11-07); a new category there is simply not offered until the snapshot is
