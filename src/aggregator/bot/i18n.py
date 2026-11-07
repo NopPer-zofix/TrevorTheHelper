@@ -55,10 +55,7 @@ EN: dict[str, str] = {
     "btn_any_category": "🔎 Any category",
     "category_line": "🗂 Category: {category}",
     "category_expired": "That question has expired. Please send your search again.",
-    "unusual_hidden": (
-        "🚫 {count} listing(s) with unusual prices hidden ({detail}): likely parts, accessories "
-        "or typos. You can show them in Filters."
-    ),
+    "unusual_hidden": "🚫 {count} listing(s) with unusual prices hidden ({detail})",
     "unusual_low": "under {price}",
     "unusual_high": "over {price}",
     "unusual_mixed": (
@@ -175,10 +172,7 @@ RU: dict[str, str] = {
     "btn_any_category": "🔎 Любая категория",
     "category_line": "🗂 Категория: {category}",
     "category_expired": "Этот вопрос устарел. Отправьте запрос ещё раз.",
-    "unusual_hidden": (
-        "🚫 Скрыто объявлений с необычной ценой: {count} ({detail}). Скорее всего, это запчасти, "
-        "аксессуары или опечатки. Показать их можно в фильтрах."
-    ),
+    "unusual_hidden": "🚫 Скрыто объявлений с необычной ценой: {count} ({detail})",
     "unusual_low": "ниже {price}",
     "unusual_high": "выше {price}",
     "unusual_mixed": (
