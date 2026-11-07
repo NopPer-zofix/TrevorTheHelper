@@ -22,6 +22,7 @@ F_MENU = "f:menu"
 F_BACK = "f:back"
 F_RESET = "f:reset"  # from the results screen: stay on results
 F_RESET_MENU = "f:reset:menu"  # from the filters menu: stay in the menu
+F_UNUSUAL = "f:odd"  # toggle showing unusually priced listings
 ALL_SOURCES = "all"
 
 LANGUAGE_BUTTONS = (("English", "en"), ("Русский", "ru"))
@@ -113,12 +114,18 @@ def filters_keyboard(t: Texts, filters: Filters, sources: Sequence[str]) -> Inli
         InlineKeyboardButton(text=min_label, callback_data=f"{FILTER_PREFIX}price:min"),
         InlineKeyboardButton(text=max_label, callback_data=f"{FILTER_PREFIX}price:max"),
     ]
+    unusual_state = t("unusual.shown" if filters.show_unusual_prices else "unusual.hidden")
+    unusual_row = [
+        InlineKeyboardButton(text=t("filter_unusual", value=unusual_state), callback_data=F_UNUSUAL)
+    ]
     last_row = [InlineKeyboardButton(text=t("btn_back"), callback_data=F_BACK)]
     if not filters.is_default:
         last_row.insert(
             0, InlineKeyboardButton(text=t("btn_reset_filters"), callback_data=F_RESET_MENU)
         )
-    return InlineKeyboardMarkup(inline_keyboard=[sort_row, source_row, price_row, last_row])
+    return InlineKeyboardMarkup(
+        inline_keyboard=[sort_row, source_row, price_row, unusual_row, last_row]
+    )
 
 
 def price_prompt_keyboard(t: Texts) -> InlineKeyboardMarkup:

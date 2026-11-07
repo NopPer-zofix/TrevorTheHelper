@@ -135,6 +135,23 @@ def _stats(t: Texts, view: ResultView) -> list[str]:
     return lines
 
 
+def _unusual_note(t: Texts, view: ResultView, filters: Filters | None) -> list[str]:
+    """Tells the user what the price-case split did, so hidden listings never go unnoticed."""
+    unusual = view.unusual
+    if unusual.mixed:
+        return [t("unusual_mixed")]
+    if filters is not None and filters.show_unusual_prices:
+        return [t("unusual_shown")] if view.unusual_keys else []
+    if not unusual.count:
+        return []
+    details: list[str] = []
+    if unusual.low_count and unusual.low_below is not None:
+        details.append(t("unusual_low", price=format_money(unusual.low_below)))
+    if unusual.high_count and unusual.high_above is not None:
+        details.append(t("unusual_high", price=format_money(unusual.high_above)))
+    return [t("unusual_hidden", count=unusual.count, detail=" · ".join(details))]
+
+
 def _deals(t: Texts, deals: Sequence[BestDeal], title_limit: int) -> list[str]:
     if not deals:
         return []
@@ -154,7 +171,9 @@ def _deals(t: Texts, deals: Sequence[BestDeal], title_limit: int) -> list[str]:
     return lines
 
 
-def _card(t: Texts, number: int, listing: Listing, title_limit: int) -> str:
+def _card(
+    t: Texts, number: int, listing: Listing, title_limit: int, *, unusual: bool = False
+) -> str:
     price = listing.price_eur
     if price is None:
         price_text = t("card_price_none")
@@ -162,6 +181,8 @@ def _card(t: Texts, number: int, listing: Listing, title_limit: int) -> str:
         price_text = format_money(price)
         if listing.currency and listing.currency.upper() != "EUR" and listing.price_amount:
             price_text += f" ({listing.price_amount:,.0f} {escape(listing.currency.upper())})"
+        if unusual:
+            price_text = f"⚠️ {price_text}"
     city_text = t.city(listing.city.value)
     approx = "~" if listing.source in APPROXIMATE_DATE_SOURCES else ""
     posted = t("card_posted", date=approx + listing.posted_at.strftime("%d.%m.%Y"))
@@ -185,13 +206,14 @@ def format_results(
     budget = TELEGRAM_MESSAGE_LIMIT - _SAFETY_MARGIN
 
     def compose(title_limit: int, card_count: int) -> str:
-        sections = ["\n".join(_header(t, outcome, view, filters)), "\n".join(_stats(t, view))]
+        stats_block = [*_stats(t, view), *_unusual_note(t, view, filters)]
+        sections = ["\n".join(_header(t, outcome, view, filters)), "\n".join(stats_block)]
         deals = _deals(t, view.best_deals, title_limit) if show_deals else []
         if deals:
             sections.append("\n".join(deals))
         if card_count:
             cards = [
-                _card(t, start + i, li, title_limit)
+                _card(t, start + i, li, title_limit, unusual=li.key in view.unusual_keys)
                 for i, li in enumerate(chunk[:card_count], start=1)
             ]
             heading = t("page_title", page=page + 1, pages=page_count(total))
@@ -251,6 +273,8 @@ def format_filters_summary(t: Texts, filters: Filters) -> str:
         parts.append(t(f"sort.{filters.sort.value}"))
     if filters.source is not None:
         parts.append(source_label(filters.source))
+    if filters.show_unusual_prices:
+        parts.append(t("summary_unusual"))
     return " · ".join(parts)
 
 
@@ -265,6 +289,10 @@ def format_filters_menu(
             t("filter_price", value=format_price_filter(t, filters)),
             t("filter_sort", value=t(f"sort.{filters.sort.value}")),
             t("filter_source", value=source),
+            t(
+                "filter_unusual",
+                value=t("unusual.shown" if filters.show_unusual_prices else "unusual.hidden"),
+            ),
             "",
             t("filters_matching", shown=len(view.listings), total=len(outcome.listings)),
         ]

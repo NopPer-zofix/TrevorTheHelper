@@ -66,6 +66,9 @@ class Filters(BaseModel):
     max_price: Decimal | None = None  # EUR
     sort: SortOrder = SortOrder.NEWEST
     source: str | None = None  # None = all sources
+    # Listings priced far outside the main group (see analytics/price_cases.py) are hidden unless
+    # this is True. They never count towards the statistics either way.
+    show_unusual_prices: bool = False
 
     @property
     def is_default(self) -> bool:

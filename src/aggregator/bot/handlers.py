@@ -31,6 +31,7 @@ from aggregator.services.filters import (
     set_price_bound,
     set_sort,
     set_source,
+    toggle_unusual_prices,
 )
 from aggregator.services.quota import check_quota
 from aggregator.services.search_service import InvalidQueryError
@@ -228,6 +229,9 @@ def _apply_filter_action(
         session.filters, session.page = Filters(), 0
     elif action.startswith("sort:"):
         session.filters = set_sort(session.filters, action.removeprefix("sort:"))
+        session.page = 0
+    elif action == "odd":
+        session.filters = toggle_unusual_prices(session.filters)
         session.page = 0
     elif action.startswith("src:"):
         chosen = action.removeprefix("src:")

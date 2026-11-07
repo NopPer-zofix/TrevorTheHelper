@@ -216,3 +216,22 @@ async def test_messages_without_text_get_a_friendly_reply(harness: Harness) -> N
     await onboard(harness)
     await harness.send_without_text()
     assert "only read text" in harness.session.of(SendMessage)[-1].text
+
+
+async def test_unusual_prices_toggle_in_the_filters_menu(harness: Harness) -> None:
+    await searched(harness)
+    await harness.tap("f:menu")
+    menu = harness.session.of(EditMessageText)[-1]
+    assert "Unusual prices: hidden" in menu.text
+    assert "f:odd" in harness.session.buttons(menu)
+
+    await harness.tap("f:odd")
+    menu = harness.session.of(EditMessageText)[-1]
+    assert "Unusual prices: shown" in menu.text
+    assert "f:reset:menu" in harness.session.buttons(menu)  # a non-default filter is active
+
+    await harness.tap("f:back")
+    assert "unusual prices shown" in harness.session.of(EditMessageText)[-1].text
+
+    await harness.tap("f:reset")
+    assert "Filters:" not in harness.session.of(EditMessageText)[-1].text

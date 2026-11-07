@@ -46,6 +46,21 @@ EN: dict[str, str] = {
     "stats_unreliable": "⚠️ Only {count} priced listing(s) — statistics are unreliable.",
     "stats_none": "No prices in these listings.",
     "stats_unpriced": "{count} listing(s) without a price are not counted.",
+    "unusual_hidden": (
+        "🚫 {count} listing(s) with unusual prices hidden ({detail}): likely parts, accessories "
+        "or typos. You can show them in Filters."
+    ),
+    "unusual_low": "under {price}",
+    "unusual_high": "over {price}",
+    "unusual_mixed": (
+        "ℹ️ Prices here vary a lot, so the statistics may not be representative. "
+        "A more specific search will help."
+    ),
+    "unusual_shown": "⚠️ Unusually priced listings are marked ⚠️ and not counted in the statistics.",
+    "filter_unusual": "Unusual prices: {value}",
+    "unusual.hidden": "hidden",
+    "unusual.shown": "shown",
+    "summary_unusual": "unusual prices shown",
     "deals_title": "🏷 <b>Best deals</b>",
     "deal_line": '{index}. <a href="{url}">{title}</a> — {price} ({discount}% below median)',
     "page_title": "📄 <b>Listings</b> — page {page}/{pages}",
@@ -141,6 +156,21 @@ RU: dict[str, str] = {
     "stats_unreliable": "⚠️ Объявлений с ценой всего {count} — статистика ненадёжна.",
     "stats_none": "В этих объявлениях нет цен.",
     "stats_unpriced": "Объявления без цены ({count}) не учитываются.",
+    "unusual_hidden": (
+        "🚫 Скрыто объявлений с необычной ценой: {count} ({detail}). Скорее всего, это запчасти, "
+        "аксессуары или опечатки. Показать их можно в фильтрах."
+    ),
+    "unusual_low": "ниже {price}",
+    "unusual_high": "выше {price}",
+    "unusual_mixed": (
+        "ℹ️ Цены здесь сильно различаются, поэтому статистика может быть нерепрезентативной. "
+        "Уточните запрос."
+    ),
+    "unusual_shown": "⚠️ Объявления с необычной ценой помечены ⚠️ и не учитываются в статистике.",
+    "filter_unusual": "Необычные цены: {value}",
+    "unusual.hidden": "скрыты",
+    "unusual.shown": "показаны",
+    "summary_unusual": "необычные цены показаны",
     "deals_title": "🏷 <b>Выгодные предложения</b>",
     "deal_line": '{index}. <a href="{url}">{title}</a> — {price} (на {discount}% ниже медианы)',
     "page_title": "📄 <b>Объявления</b> — страница {page}/{pages}",

@@ -8,9 +8,10 @@ from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 
+from aggregator.analytics.price_cases import PriceCase, find_price_cuts
 from aggregator.analytics.stats import compute_stats, find_best_deals
 from aggregator.domain.models import Filters, Listing, SortOrder
-from aggregator.search.models import ResultView
+from aggregator.search.models import ResultView, UnusualPrices
 
 _NO_PRICE_LAST = Decimal("Infinity")
 
@@ -57,12 +58,43 @@ def apply_filters(listings: Sequence[Listing], filters: Filters) -> list[Listing
 def build_view(
     listings: Sequence[Listing], filters: Filters, best_deal_ratio: float = 0.75
 ) -> ResultView:
-    """Filtered + sorted listings with stats and best deals computed for exactly that subset."""
-    selected = apply_filters(listings, filters)
+    """Filtered + sorted listings with stats and best deals computed for exactly that subset.
+
+    Unusually priced listings (far from the main price group of the *whole* result set, so the
+    boundaries do not move when the user narrows the price range) are hidden unless the user asked
+    to see them, and are always left out of the statistics and the best deals.
+    """
+    cuts = find_price_cuts([p for li in listings if (p := li.price_eur) is not None])
+    passing = [li for li in listings if _passes(li, filters)]
+
+    normal: list[Listing] = []
+    unusual: list[Listing] = []
+    low = high = 0
+    for listing in passing:
+        case = cuts.case_of(listing.price_eur)
+        if case is PriceCase.NORMAL:
+            normal.append(listing)
+            continue
+        unusual.append(listing)
+        if case is PriceCase.LOW:
+            low += 1
+        else:
+            high += 1
+
+    shown = [*normal, *unusual] if filters.show_unusual_prices else normal
+    selected = sort_listings(shown, filters.sort)
     return ResultView(
         listings=selected,
-        stats=compute_stats([li.price_eur for li in selected]),
-        best_deals=find_best_deals(selected, ratio=best_deal_ratio),
+        stats=compute_stats([li.price_eur for li in normal]),
+        best_deals=find_best_deals(normal, ratio=best_deal_ratio),
         unpriced_count=sum(1 for li in selected if li.price_eur is None),
         counts_by_source=dict(Counter(li.source for li in selected)),
+        unusual=UnusualPrices(
+            low_count=low,
+            high_count=high,
+            low_below=cuts.low_below,
+            high_above=cuts.high_above,
+            mixed=cuts.mixed,
+        ),
+        unusual_keys=frozenset(li.key for li in unusual),
     )

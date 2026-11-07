@@ -66,3 +66,8 @@ def set_source(filters: Filters, source: str | None, available: Sequence[str]) -
     if source is not None and source not in available:
         raise FilterError("unknown_source")
     return filters.model_copy(update={"source": source})
+
+
+def toggle_unusual_prices(filters: Filters) -> Filters:
+    """Show / hide the listings whose price is far outside the main group."""
+    return filters.model_copy(update={"show_unusual_prices": not filters.show_unusual_prices})
