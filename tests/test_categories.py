@@ -227,9 +227,14 @@ def test_intent_of(text: str, intent: str | None) -> None:
 
 
 def advert(
-    ident: int, title: str, price: int, ancestors: list[str] | None, location: str = "Limassol — X"
+    ident: int,
+    title: str,
+    price: int,
+    ancestors: list[str] | None,
+    location: str = "Limassol — X",
+    leaf: str = "leaf",
 ) -> dict[str, Any]:
-    rubric: dict[str, Any] = {"slug": "leaf"}
+    rubric: dict[str, Any] = {"slug": leaf}
     if ancestors is not None:
         rubric["ancestors"] = [{"slug": slug} for slug in ancestors]
     return {
@@ -251,6 +256,18 @@ def page(adverts: list[dict[str, Any]]) -> str:
     return (
         f"<html><body><script>self.__next_f.push([1,{json.dumps(stream)}])</script></body></html>"
     )
+
+
+def test_the_rubric_itself_is_the_last_level_of_the_path() -> None:
+    """Real shape seen on the live site: a flat ad has ancestors [real-estate-to-rent] only, and
+    its own category (apartments-flats) is the rubric's slug."""
+    flat_ad = advert(1, "x", 1, ["real-estate-to-rent"], leaf="apartments-flats")
+    assert advert_category(flat_ad) == "real-estate-to-rent/apartments-flats"
+    house_ad = advert(2, "x", 1, ["real-estate-for-sale"], leaf="houses")
+    assert advert_category(house_ad) == "real-estate-for-sale/houses"
+    # An iPhone ad: three ancestors, a model-level rubric; everything below level 2 is cut.
+    phone_ad = advert(3, "x", 1, ["telephones", "mobile-phones", "iphone"], leaf="iphone-13")
+    assert advert_category(phone_ad) == PHONES
 
 
 def test_advert_category_is_reduced_to_the_catalog() -> None:

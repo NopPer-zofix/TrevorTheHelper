@@ -84,7 +84,11 @@ def advert_category(advert: dict[str, Any]) -> str | None:
     ancestors = rubric.get(sel.F_ANCESTORS)
     if not isinstance(ancestors, list):
         return None
+    # The advert's own category is the rubric itself; `ancestors` are only its parents. For a flat
+    # ad: ancestors = [real-estate-to-rent], rubric = apartments-flats. For an iPhone ad:
+    # ancestors = [telephones, mobile-phones, iphone], rubric = iphone-13 (cut off below).
     slugs = [a.get(sel.F_SLUG) for a in ancestors if isinstance(a, dict)]
+    slugs.append(rubric.get(sel.F_SLUG))
     return normalize_path("/".join(s for s in slugs if isinstance(s, str) and s))
 
 
