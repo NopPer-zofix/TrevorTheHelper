@@ -66,8 +66,10 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 "src/aggregator/domain/category_data.py" = ["RUF001"]
 "src/aggregator/domain/categories.py" = ["RUF001", "RUF002"]
 "src/aggregator/domain/lexicon.py" = ["RUF001", "RUF002", "RUF003"]
+"src/aggregator/domain/areas.py" = ["RUF001", "RUF002", "RUF003"]
+"src/aggregator/sources/telegram/spam.py" = ["RUF001", "RUF002", "RUF003"]
 "src/aggregator/sources/base.py" = ["RUF001"]
-"tests/*" = ["RUF001", "RUF002", "RUF003"]
+"tests/*" = ["RUF001", "RUF002", "RUF003", "E501"]
 
 [tool.mypy]
 python_version = "3.12"

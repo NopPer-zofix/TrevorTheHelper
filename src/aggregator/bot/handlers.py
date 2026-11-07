@@ -14,7 +14,9 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from aggregator.bot import keyboards
 from aggregator.bot.context import Services
 from aggregator.bot.formatting import (
+    MAX_AREA_BUTTONS,
     clamp_page,
+    format_area_prompt,
     format_category_question,
     format_empty,
     format_filters_menu,
@@ -30,6 +32,7 @@ from aggregator.search.category_choice import Ask, Decision, Resolved
 from aggregator.services.filters import (
     FilterError,
     parse_price_input,
+    set_area,
     set_price_bound,
     set_sort,
     set_source,
@@ -334,6 +337,21 @@ def _apply_filter_action(
         session.page = 0
     elif action == "odd":
         session.filters = toggle_unusual_prices(session.filters)
+        session.page = 0
+    elif action == "area":  # open the picker
+        areas = services.search.view(session.outcome, session.filters).areas
+        shown = areas[:MAX_AREA_BUTTONS]
+        return format_area_prompt(t, shown), keyboards.area_keyboard(t, shown)
+    elif action.startswith("area:"):
+        areas = services.search.view(session.outcome, session.filters).areas
+        chosen = action.removeprefix("area:")
+        area: str | None = None
+        if chosen != keyboards.ALL_SOURCES:
+            try:
+                area = areas[:MAX_AREA_BUTTONS][int(chosen)][0]
+            except (ValueError, IndexError) as exc:  # forged or stale callback data
+                raise FilterError("unknown_area") from exc
+        session.filters = set_area(session.filters, area, [name for name, _ in areas])
         session.page = 0
     elif action.startswith("src:"):
         chosen = action.removeprefix("src:")

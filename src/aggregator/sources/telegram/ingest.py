@@ -25,6 +25,7 @@ class IngestAction(StrEnum):
     STORED_INACTIVE = "stored_inactive"  # sold: kept for the record, hidden from search
     SKIPPED_WANTED = "skipped_wanted"
     SKIPPED_EMPTY = "skipped_empty"
+    SKIPPED_SPAM = "skipped_spam"  # recruitment / earn-money bots, link-only posts, Chinese text
 
 
 def external_id(chat_id: int, message_id: int) -> str:
@@ -63,6 +64,8 @@ async def ingest_message(
     skipped: IngestAction | None = None
     if not parsed.title:
         skipped = IngestAction.SKIPPED_EMPTY
+    elif parsed.spam is not None:
+        skipped = IngestAction.SKIPPED_SPAM
     elif parsed.is_wanted:
         skipped = IngestAction.SKIPPED_WANTED
     if skipped is not None:

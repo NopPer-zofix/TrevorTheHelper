@@ -19,6 +19,8 @@ _NO_PRICE_LAST = Decimal("Infinity")
 def _passes(listing: Listing, filters: Filters) -> bool:
     if filters.source is not None and listing.source != filters.source:
         return False
+    if filters.area is not None and listing.area != filters.area:
+        return False
     if filters.min_price is None and filters.max_price is None:
         return True
     price = listing.price_eur
@@ -83,7 +85,18 @@ def build_view(
         cuts = PriceCuts(mixed=True)  # rentals next to sales: no price is "unusual" for the set
     else:
         cuts = find_price_cuts([p for li in listings if (p := li.price_eur) is not None])
-    passing = [li for li in listings if _passes(li, filters)]
+    # The area picker lists the areas of what the user would see if no area were chosen, so its
+    # counts always match what a tap will show.
+    without_area = filters.model_copy(update={"area": None})
+    candidates = [li for li in listings if _passes(li, without_area)]
+    pool = [
+        li
+        for li in candidates
+        if filters.show_unusual_prices or cuts.case_of(li.price_eur) is PriceCase.NORMAL
+    ]
+    area_counts = Counter(li.area for li in pool if li.area)
+    areas = sorted(area_counts.items(), key=lambda item: (-item[1], item[0]))
+    passing = [li for li in candidates if filters.area is None or li.area == filters.area]
 
     normal: list[Listing] = []
     unusual: list[Listing] = []
@@ -115,4 +128,5 @@ def build_view(
             mixed=cuts.mixed,
         ),
         unusual_keys=frozenset(li.key for li in unusual),
+        areas=areas,
     )

@@ -16,6 +16,7 @@ from telethon import TelegramClient, events, utils
 
 from aggregator.db.repositories import ListingRepository
 from aggregator.sources.telegram.ingest import SOURCE_NAME, external_id, ingest_message
+from aggregator.sources.telegram.spam import spam_reason
 
 log = structlog.get_logger()
 
@@ -138,6 +139,19 @@ class Indexer:
             log.info("indexer.deleted", chat_id=chat_id, requested=len(ids), deactivated=changed)
         except Exception:
             log.exception("indexer.delete_failed")
+
+    async def purge_spam(self) -> int:
+        """Hide spam stored before the spam rules existed (and anything the rules now catch).
+
+        The rows are only deactivated, never deleted. Returns how many were hidden.
+        """
+
+        def is_spam(title: str, description: str | None) -> bool:
+            return spam_reason(f"{title}\n{description or ''}") is not None
+
+        hidden = await self._repository.deactivate_where(SOURCE_NAME, is_spam)
+        log.info("indexer.spam_purged", deactivated=hidden)
+        return hidden
 
     async def run_retention(self) -> None:
         """Periodically hide listings older than the configured max age."""

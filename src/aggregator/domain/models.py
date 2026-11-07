@@ -25,6 +25,9 @@ class Listing(BaseModel):
     price_amount: Decimal | None = None  # None = missing / "negotiable"
     currency: str | None = None
     city: City = City.UNKNOWN
+    # Neighbourhood inside the city, as the source writes it ("Germasogeia Tourist Area"). None
+    # when the source gives none (Telegram posts) or only names the city.
+    area: str | None = None
     posted_at: datetime
     # Source category path, reduced to the catalog (e.g. "telephones/mobile-phones"). None when the
     # source has no categories (Telegram posts) or the advert's category is unknown.
@@ -72,6 +75,9 @@ class Filters(BaseModel):
     # Listings priced far outside the main group (see analytics/price_cases.py) are hidden unless
     # this is True. They never count towards the statistics either way.
     show_unusual_prices: bool = False
+    # Only listings in this neighbourhood (an `area` value of the fetched listings). Listings with
+    # no area are excluded while it is set, like unpriced listings under a price bound.
+    area: str | None = None
     # A source-side category scope ("real-estate-to-rent/apartments-flats"). It is set by the
     # search itself when the user answers a category question, never by the Filters menu, and only
     # sources (and the orchestrator's safety check) look at it. It is not a "user filter".

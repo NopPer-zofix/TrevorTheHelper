@@ -6,8 +6,10 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from aggregator.domain.areas import locate
 from aggregator.domain.cities import City, detect_city
 from aggregator.domain.pricing import ExtractedPrice, extract_price
+from aggregator.sources.telegram.spam import spam_reason
 
 MAX_TITLE_LENGTH = 120
 WANTED_WINDOW = 100  # "wanted" markers only count near the start of the post
@@ -34,6 +36,8 @@ class ParsedMessage:
     city: City
     is_sold: bool
     is_wanted: bool
+    area: str | None = None  # neighbourhood named in the text (not stored: re-derived on read)
+    spam: str | None = None  # why the post is spam (see spam.py), or None
 
 
 def _strip_decorations(line: str) -> str:
@@ -78,11 +82,14 @@ def parse_message(text: str) -> ParsedMessage:
             body = f"{title_full}\n{body}".strip()  # keep the part cut from the title searchable
         description = body or None
 
+    city, area = locate(text, detect_city(text))
     return ParsedMessage(
         title=title,
         description=description,
         price=extract_price(text),
-        city=detect_city(text),
+        city=city,
+        area=area,
+        spam=spam_reason(text),
         is_sold=_SOLD.search(text) is not None,
         is_wanted=_WANTED.search(text[:WANTED_WINDOW]) is not None,
     )

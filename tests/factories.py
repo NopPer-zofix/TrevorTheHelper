@@ -22,6 +22,7 @@ def make_listing(
     description: str | None = None,
     days_old: int = 1,
     category: str | None = None,
+    area: str | None = None,
 ) -> Listing:
     ext = external_id or f"{source}-{abs(hash((title, price, source, days_old))) % 10**8}"
     return Listing(
@@ -35,4 +36,5 @@ def make_listing(
         city=city,
         posted_at=NOW - timedelta(days=days_old),
         category=category,
+        area=area,
     )

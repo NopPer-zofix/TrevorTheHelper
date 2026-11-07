@@ -71,3 +71,10 @@ def set_source(filters: Filters, source: str | None, available: Sequence[str]) -
 def toggle_unusual_prices(filters: Filters) -> Filters:
     """Show / hide the listings whose price is far outside the main group."""
     return filters.model_copy(update={"show_unusual_prices": not filters.show_unusual_prices})
+
+
+def set_area(filters: Filters, area: str | None, available: Sequence[str]) -> Filters:
+    """Restrict to one neighbourhood; `None` clears it. Only areas seen in the results are valid."""
+    if area is not None and area not in available:
+        raise FilterError("unknown_area")
+    return filters.model_copy(update={"area": area})

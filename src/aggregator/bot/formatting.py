@@ -279,6 +279,8 @@ def format_filters_summary(t: Texts, filters: Filters) -> str:
         parts.append(t(f"sort.{filters.sort.value}"))
     if filters.source is not None:
         parts.append(source_label(filters.source))
+    if filters.area is not None:
+        parts.append(escape(filters.area))
     if filters.show_unusual_prices:
         parts.append(t("summary_unusual"))
     return " · ".join(parts)
@@ -295,6 +297,7 @@ def format_filters_menu(
             t("filter_price", value=format_price_filter(t, filters)),
             t("filter_sort", value=t(f"sort.{filters.sort.value}")),
             t("filter_source", value=source),
+            t("filter_area", value=escape(filters.area) if filters.area else t("area_any")),
             t(
                 "filter_unusual",
                 value=t("unusual.shown" if filters.show_unusual_prices else "unusual.hidden"),
@@ -334,3 +337,12 @@ def option_label(t: Texts, option: CategoryOption, prefix: str | None) -> str:
 def format_category_question(t: Texts, query: str, prefix: str | None) -> str:
     where = t("category_where", label=escape(category_label(prefix, t.language))) if prefix else ""
     return t("category_question", query=escape(query), where=where)
+
+
+# --- area picker ---------------------------------------------------------------------------
+
+MAX_AREA_BUTTONS = 20
+
+
+def format_area_prompt(t: Texts, areas: Sequence[tuple[str, int]]) -> str:
+    return t("area_prompt") if areas else t("area_none")

@@ -151,7 +151,7 @@ Compose has a disposable one on port 5433:
 docker compose --profile test up -d postgres-test
 export TEST_DATABASE_URL=postgresql+asyncpg://aggregator:aggregator@localhost:5433/aggregator_test
 pytest                                   # PowerShell: $env:TEST_DATABASE_URL = "..."
-docker compose --profile test down       # data was in tmpfs, nothing is kept
+docker compose --profile test rm -sf postgres-test   # removes ONLY the test DB (data was in tmpfs)
 ```
 
 ### Adding a source

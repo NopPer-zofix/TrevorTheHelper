@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aggregator.db.models import Listing as ListingRow
+from aggregator.domain.areas import locate
 from aggregator.domain.cities import City
 from aggregator.domain.models import Listing
 
@@ -88,6 +89,28 @@ class ListingRepository:
             result = await session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
 
+    async def deactivate_where(
+        self, source: str, is_unwanted: Callable[[str, str | None], bool]
+    ) -> int:
+        """Deactivate active listings whose (title, description) the predicate rejects.
+
+        Used to clean out spam that was stored before a rule existed. Rows stay in the table
+        (is_active=False), so nothing is lost and a wrong rule can be undone.
+        """
+        stmt = select(ListingRow.id, ListingRow.title, ListingRow.description).where(
+            ListingRow.source == source, ListingRow.is_active.is_(True)
+        )
+        async with self._session_factory() as session:
+            rows = (await session.execute(stmt)).all()
+        ids = [row.id for row in rows if is_unwanted(row.title, row.description)]
+        if not ids:
+            return 0
+        async with self._session_factory() as session, session.begin():
+            result = await session.execute(
+                update(ListingRow).where(ListingRow.id.in_(ids)).values(is_active=False)
+            )
+        return int(getattr(result, "rowcount", 0) or 0)
+
     async def search(
         self,
         source: str,
@@ -142,6 +165,9 @@ def _to_domain(row: ListingRow) -> Listing:
         city = City.UNKNOWN
     if city is City.ALL_CYPRUS:  # a search scope, never a listing's own city
         city = City.UNKNOWN
+    # The neighbourhood is not a column: it is read from the text each time, so improving the
+    # spelling tables takes effect for listings that were stored long ago.
+    area = locate(f"{row.title}\n{row.description or ''}", city)[1]
     return Listing(
         source=row.source,
         external_id=row.external_id,
@@ -151,5 +177,6 @@ def _to_domain(row: ListingRow) -> Listing:
         price_amount=row.price_amount,
         currency=row.currency,
         city=city,
+        area=area,
         posted_at=row.posted_at,
     )

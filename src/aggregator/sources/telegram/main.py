@@ -55,6 +55,7 @@ async def main() -> int:
             return 1
         indexer.register_handlers()  # before backfill, so nothing posted meanwhile is missed
         log.info("indexer.started", groups=[g.username for g in groups])
+        await indexer.purge_spam()  # hide spam stored before the filter existed
         for group in groups:
             await indexer.backfill(group)
         retention = asyncio.create_task(indexer.run_retention())

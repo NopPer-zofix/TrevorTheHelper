@@ -128,3 +128,21 @@ async def test_deactivate_older_than(repo: ListingRepository) -> None:
 async def test_blank_terms_return_nothing(repo: ListingRepository) -> None:
     await repo.upsert(make_listing("1:1", "Bike"))
     assert await repo.search(SOURCE, ["", "  "], None, max_age_days=30) == []
+
+
+async def test_deactivate_where_hides_only_what_the_predicate_rejects(
+    repo: ListingRepository,
+) -> None:
+    await repo.upsert(make_listing("1:1", "Bike", description="good bike"))
+    await repo.upsert(make_listing("1:2", "Bike spam", description="earn money"))
+    await repo.upsert(make_listing("1:3", "Bike", description=None))
+
+    hidden = await repo.deactivate_where(
+        SOURCE, lambda title, description: "spam" in title or "earn" in (description or "")
+    )
+
+    assert hidden == 1
+    found = await repo.search(SOURCE, ["bike"], None, max_age_days=30)
+    assert sorted(item.external_id for item in found) == ["1:1", "1:3"]
+    # a second run has nothing left to hide
+    assert await repo.deactivate_where(SOURCE, lambda title, description: "spam" in title) == 0

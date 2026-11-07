@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import re
 
+from aggregator.domain.areas import AREAS
+
 # (category, (canonical, other forms...)). Categories feed the negative-term lists in
 # query/fallback.py; "property", "intent" and "place" are handled by dedicated rules there.
-GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+_BASE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     # --- phones, computers, audio, gaming, TV, cameras ---------------------------------------
     ("phone", ("iphone", "айфон", "айфона", "айфоны")),
     ("phone", ("smartphone", "смартфон")),
@@ -92,12 +94,29 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("intent", ("rent", "rental", "rentals", "аренда", "аренды", "аренду", "сдается", "сдам",
                 "снять", "сниму", "посуточно")),
     # --- places ------------------------------------------------------------------------------
-    ("place", ("limassol", "лимассол", "лимасол", "лемесос", "lemesos")),
-    ("place", ("nicosia", "никосия", "никосии", "лефкосия", "lefkosia")),
+    ("place", ("limassol", "лимассол", "лимасол", "лемесос", "лемесо", "lemesos")),
+    ("place", ("nicosia", "никосия", "никосии", "никозия", "лефкосия", "лефкоза", "левкосия",
+                "lefkosia", "lefkosa")),
     ("place", ("larnaca", "larnaka", "ларнака", "ларнаке", "ларнаки")),
     ("place", ("paphos", "pafos", "пафос", "пафосе")),
-    ("place", ("famagusta", "фамагуста", "фамагусте")),
+    ("place", ("famagusta", "фамагуста", "фамагусте", "ammochostos", "аммохостос", "амохостос")),
 )  # fmt: skip
+
+
+def _area_groups() -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """One group per single-word area, so "Гермасойя" and "Yermasoyia" meet "Germasogeia"."""
+    groups = []
+    for area in AREAS:
+        canonical = area.name.lower()
+        if " " in canonical:
+            continue
+        forms = [canonical, *(a.lower().replace("ё", "е") for a in area.aliases)]
+        singles = tuple(dict.fromkeys(f for f in forms if " " not in f and "-" not in f))
+        groups.append(("place", singles))
+    return tuple(groups)
+
+
+GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (*_BASE_GROUPS, *_area_groups())
 
 # Only lowercase words with "е" (no "ё") may appear above; checked by the tests.
 CANONICAL: dict[str, str] = {}

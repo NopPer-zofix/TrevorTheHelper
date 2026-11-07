@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from aggregator.domain.areas import canonical_area
 from aggregator.domain.categories import normalize_path
 from aggregator.domain.cities import City, detect_city
 from aggregator.domain.models import Listing
@@ -76,6 +77,35 @@ def extract_adverts(html: str) -> list[dict[str, Any]] | None:
     return None
 
 
+_DISTRICT_NAMES = frozenset(
+    {
+        "limassol", "lemesos", "nicosia", "lefkosia", "larnaca", "larnaka", "paphos", "pafos",
+        "famagusta", "ammochostos",
+    }
+)  # fmt: skip
+
+
+def area_from_location(location: str | None) -> str | None:
+    """The neighbourhood in Bazaraki's location text, without the city.
+
+    "Limassol — Limassol - Agia Zoni" -> "Agia Zoni"; "Limassol — Germasogeia Tourist Area" ->
+    "Germasogeia Tourist Area"; "Limassol" (only the city) -> None.
+    """
+    if not location:
+        return None
+    text = " ".join(location.split())
+    if "—" in text:  # "<district> — <place>"
+        text = text.split("—", 1)[1].strip()
+    # Only the district NAMES count as "the city": Germasogeia, Protaras or Egkomi are
+    # neighbourhoods even though the city lookup maps them to a district.
+    head, separator, rest = text.partition(" - ")
+    if separator and head.casefold() in _DISTRICT_NAMES:  # "Limassol - Agia Zoni"
+        text = rest.strip()
+    elif text.casefold() in _DISTRICT_NAMES:  # only the city
+        return None
+    return canonical_area(text) if text else None
+
+
 def advert_category(advert: dict[str, Any]) -> str | None:
     """The advert's category path reduced to the catalog, e.g. "telephones/mobile-phones"."""
     rubric = advert.get(sel.F_RUBRIC)
@@ -120,6 +150,7 @@ def _to_listing(
         price_amount=amount,
         currency=currency,
         city=city,
+        area=area_from_location(str(advert.get(sel.F_LOCATION) or "")),
         posted_at=parse_published(advert.get(sel.F_PUBLISHED), now),
         category=advert_category(advert),
     )

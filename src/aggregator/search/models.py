@@ -66,3 +66,5 @@ class ResultView(BaseModel):
     unusual: UnusualPrices = Field(default_factory=UnusualPrices)
     # Listings flagged as unusually priced (hidden, or shown with a marker when the user asks).
     unusual_keys: frozenset[tuple[str, str]] = frozenset()
+    # (area, number of visible listings), most listings first: what the area picker offers.
+    areas: list[tuple[str, int]] = Field(default_factory=list)

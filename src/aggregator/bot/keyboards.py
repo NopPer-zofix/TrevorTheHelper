@@ -26,6 +26,7 @@ F_BACK = "f:back"
 F_RESET = "f:reset"  # from the results screen: stay on results
 F_RESET_MENU = "f:reset:menu"  # from the filters menu: stay in the menu
 F_UNUSUAL = "f:odd"  # toggle showing unusually priced listings
+F_AREA = "f:area"  # open the area picker; "f:area:<n>" picks the n-th, "f:area:all" clears
 ALL_SOURCES = "all"
 
 LANGUAGE_BUTTONS = (("English", "en"), ("Русский", "ru"))
@@ -117,6 +118,8 @@ def filters_keyboard(t: Texts, filters: Filters, sources: Sequence[str]) -> Inli
         InlineKeyboardButton(text=min_label, callback_data=f"{FILTER_PREFIX}price:min"),
         InlineKeyboardButton(text=max_label, callback_data=f"{FILTER_PREFIX}price:max"),
     ]
+    area_label = t("btn_area") + (f": {filters.area}" if filters.area else "")
+    area_row = [InlineKeyboardButton(text=area_label, callback_data=F_AREA)]
     unusual_state = t("unusual.shown" if filters.show_unusual_prices else "unusual.hidden")
     unusual_row = [
         InlineKeyboardButton(text=t("filter_unusual", value=unusual_state), callback_data=F_UNUSUAL)
@@ -127,7 +130,7 @@ def filters_keyboard(t: Texts, filters: Filters, sources: Sequence[str]) -> Inli
             0, InlineKeyboardButton(text=t("btn_reset_filters"), callback_data=F_RESET_MENU)
         )
     return InlineKeyboardMarkup(
-        inline_keyboard=[sort_row, source_row, price_row, unusual_row, last_row]
+        inline_keyboard=[sort_row, source_row, price_row, area_row, unusual_row, last_row]
     )
 
 
@@ -149,6 +152,26 @@ def category_keyboard(
             InlineKeyboardButton(
                 text=t("btn_any_category"), callback_data=f"{CATEGORY_PREFIX}{ANY_CATEGORY}"
             )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def area_keyboard(t: Texts, areas: Sequence[tuple[str, int]]) -> InlineKeyboardMarkup:
+    """One button per area (`f:area:<index>`), then "All areas" and Back to the filters menu."""
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=t("area_option", area=name, count=count),
+                callback_data=f"{F_AREA}:{index}",
+            )
+        ]
+        for index, (name, count) in enumerate(areas)
+    ]
+    rows.append(
+        [
+            InlineKeyboardButton(text=t("btn_all_areas"), callback_data=f"{F_AREA}:{ALL_SOURCES}"),
+            InlineKeyboardButton(text=t("btn_cancel"), callback_data=F_MENU),
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
