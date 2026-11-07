@@ -104,6 +104,17 @@ text into English and Russian variants, queries all sources in parallel with a t
 (a failing source is reported, the rest still answer), drops irrelevant listings, and computes stats
 with outliers removed. Stats are flagged unreliable under 3 priced listings; best deals need 5.
 
+Two things keep the results clean:
+
+- **Category questions (Bazaraki).** Before searching, the bot looks at which Bazaraki categories
+  the results fall in. If it is clearly one thing ("iphone 13" is mobile phones) it searches inside
+  that category. If it is a real mix, it asks: "3 bedroom apartment" gets *to rent or for sale?*,
+  then *flat or house?* (only when both really appear). The words "rent", "аренда", "sale"... in
+  the query answer the first question. "Any category" skips it.
+- **Unusual prices.** Listings priced far outside the main group (a €5 case among €300 phones, a
+  €30,000 typo) are hidden, excluded from the statistics, and counted in a note; the Filters menu
+  can show them (marked ⚠️). Nothing is hidden when the results are a genuine mix of kinds.
+
 ## Project structure
 
 ```text
@@ -159,8 +170,16 @@ The orchestrator, filters, stats and bot need no changes.
   Telegram, Bazaraki, Postgres and the Anthropic API hasn't been done yet, so expect small fixes.
 - **Bazaraki dates are approximate** (the site only shows "3 days ago"), shown as `~dd.mm.yyyy`.
   If Bazaraki changes its page markup, the source reports itself unavailable.
-- **Relevance is heuristic.** "iPhone 13 Pro Max" can match "iphone 13". A multi-item post yields
-  its first price only; a price without a currency is read as EUR.
+- **Relevance is heuristic, and strict on purpose.** "iphone 13" does not match "iPhone 13 Pro Max"
+  or "mini" (a different product), nor a different storage size when both are stated; search for
+  the variant you want. Part names leading a title ("Display apple iphone 13") are dropped. A
+  multi-item post yields its first price only; a price without a currency is read as EUR.
+- **Categories exist for Bazaraki only.** Telegram posts have none, so they are not narrowed by
+  the category you pick (only by the text match). The category tree is a snapshot of Bazaraki's
+  (captured 2026-11-07); a new category there is simply not offered until the snapshot is
+  refreshed. Russian names exist for all but the jobs/services sub-categories (shown in English).
+  Bazaraki's attribute filters (bedrooms, price) are not used: robots.txt disallows them, so
+  "3 bedroom" is just part of the search text.
 - **Filters.** Price filters are euros only and hide listings without a price. Results live in
   memory for an hour and are lost on restart. Old result messages act on your latest search.
 - **Telegram city detection** uses a lookup table; posts without a city show as "unknown" and
