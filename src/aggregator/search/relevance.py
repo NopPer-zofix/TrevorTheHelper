@@ -27,6 +27,7 @@ import re
 from collections.abc import Iterable, Sequence
 from itertools import pairwise
 
+from aggregator.domain.lexicon import canonical_token, normalize_rooms
 from aggregator.domain.models import ExpandedQuery, Listing
 
 DEFAULT_MIN_SCORE = 0.75
@@ -83,12 +84,19 @@ _LEADING_PART_TERMS["laptop"] = frozenset(
 
 
 def tokenize(text: str) -> list[str]:
-    """Lowercased word tokens with letters and digits split ("iphone13" -> "iphone", "13")."""
-    lowered = text.casefold().replace("ё", "е")
+    """Language-neutral word tokens.
+
+    Lowercased, letters and digits split ("iphone13" -> "iphone", "13"), room counts written as
+    "N bedroom" whatever the phrasing ("3-х комнатная" -> "3", "bedroom"), and every known
+    translation or inflection mapped to one canonical English token ("квартира", "flats" ->
+    "apartment"; "айфон" -> "iphone"). Query and listing go through the same function, so a
+    Russian query meets an English ad.
+    """
+    lowered = normalize_rooms(text)
     tokens: list[str] = []
     for raw in _TOKEN.findall(lowered):
         for part in _LETTER_DIGIT_BOUNDARY.sub(" ", raw).split():
-            tokens.append(_UNIT_ALIASES.get(part, part))
+            tokens.append(canonical_token(_UNIT_ALIASES.get(part, part)))
     return tokens
 
 

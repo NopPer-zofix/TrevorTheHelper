@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Protocol, runtime_checkable
 
 from aggregator.domain.cities import City
@@ -16,16 +17,36 @@ class SourceError(Exception):
     """
 
 
+_CYRILLIC = re.compile(r"[а-яё]", re.IGNORECASE)
+
+
 def search_terms(query: ExpandedQuery, max_terms: int) -> list[str]:
-    """Primary term first, then variants; case-insensitive dedupe; capped at `max_terms`."""
+    """Primary term first, then variants; case-insensitive dedupe; capped at `max_terms`.
+
+    When the cap forces a choice, the first variant in the *other language* (Cyrillic versus Latin)
+    is taken second, so a site that is searched with only two terms still sees both an English and
+    a Russian phrase ("3 bedroom apartment" and "3-комнатная квартира") instead of two synonyms.
+    """
     seen: set[str] = set()
-    terms: list[str] = []
+    candidates: list[str] = []
     for candidate in [query.normalized, *query.variants]:
         cleaned = " ".join(candidate.split())
         if cleaned and cleaned.lower() not in seen:
             seen.add(cleaned.lower())
-            terms.append(cleaned)
-    return terms[: max(max_terms, 1)]
+            candidates.append(cleaned)
+    limit = max(max_terms, 1)
+    if len(candidates) <= limit:
+        return candidates
+
+    terms = candidates[:1]
+    first_is_russian = bool(_CYRILLIC.search(candidates[0]))
+    other_language = next(
+        (c for c in candidates[1:] if bool(_CYRILLIC.search(c)) != first_is_russian), None
+    )
+    if other_language is not None and limit >= 2:
+        terms.append(other_language)
+    terms += [c for c in candidates[1:] if c not in terms]
+    return terms[:limit]
 
 
 @runtime_checkable

@@ -17,7 +17,7 @@ def keeps(query: ExpandedQuery, title: str, description: str | None = None) -> b
     ("text", "expected"),
     [
         ("iPhone13 128GB", ["iphone", "13", "128", "gb"]),
-        ("Айфон 13 128 ГБ", ["айфон", "13", "128", "gb"]),
+        ("Айфон 13 128 ГБ", ["iphone", "13", "128", "gb"]),  # known words become canonical English
         ("Ёлка", ["елка"]),
         ("a + b", ["a", "+", "b"]),
     ],
@@ -134,7 +134,7 @@ def test_empty_query_phrases_do_not_hide_results() -> None:
 def test_unrelated_prefix_collisions_do_not_match() -> None:
     query = ExpandedQuery(original="bike", normalized="bike")
     assert keeps(query, "Bikes for kids")
-    assert not keeps(query, "Bicycle")  # needs a variant, not a fuzzy match
+    assert keeps(query, "Bicycle")  # a translation / synonym: same concept
     assert not keeps(query, "Bikini")
 
 

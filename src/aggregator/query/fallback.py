@@ -8,6 +8,14 @@ from __future__ import annotations
 
 import re
 
+from aggregator.domain.lexicon import (
+    FORMS_OF,
+    GROUPS,
+    PROPERTY_KINDS,
+    canonical_token,
+    category_of,
+    normalize_rooms,
+)
 from aggregator.domain.models import ExpandedQuery
 from aggregator.query.normalize import clean_expansion, normalize_input
 
@@ -24,36 +32,11 @@ _STOP_WORDS = frozenset(
     }
 )  # fmt: skip
 
-# Equivalent spellings / translations of common items. A token matching any entry of a group
-# produces variants using the other entries. The first field is the category.
-_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("phone", ("iphone", "айфон", "айфона")),
-    ("phone", ("smartphone", "смартфон")),
-    ("phone", ("phone", "телефон", "мобильный")),
-    ("phone", ("samsung", "самсунг")),
-    ("phone", ("xiaomi", "сяоми", "ксиоми")),
-    ("phone", ("huawei", "хуавей")),
-    ("tablet", ("ipad", "айпад")),
-    ("tablet", ("tablet", "планшет")),
-    ("laptop", ("laptop", "ноутбук")),
-    ("laptop", ("macbook", "макбук")),
-    ("audio", ("airpods", "аирподс", "эирподс")),
-    ("audio", ("headphones", "наушники")),
-    ("console", ("playstation", "плейстейшн", "плейстейшен")),
-    ("console", ("xbox", "иксбокс")),
-    ("tv", ("tv", "телевизор")),
-    ("camera", ("camera", "фотоаппарат", "камера")),
-    ("appliance", ("fridge", "refrigerator", "холодильник")),
-    ("appliance", ("microwave", "микроволновка", "микроволновая")),
-    ("bike", ("bike", "bicycle", "велосипед")),
-    ("bike", ("scooter", "самокат")),
-    ("furniture", ("sofa", "couch", "диван")),
-    ("furniture", ("table", "стол")),
-    ("furniture", ("chair", "стул")),
-    ("furniture", ("bed", "кровать")),
-    ("furniture", ("wardrobe", "шкаф")),
-    ("watch", ("watch", "часы")),
-)
+_GROUP_OF: dict[str, tuple[str, tuple[str, ...]]] = {
+    word: (category, group) for category, group in GROUPS for word in group
+}
+# These categories are handled by dedicated rules, not by the one-word swaps.
+_NO_SWAP = frozenset({"property", "intent", "place"})
 
 _BRANDS: dict[str, str] = {
     "iphone": "Apple", "айфон": "Apple", "ipad": "Apple", "айпад": "Apple",
@@ -76,10 +59,6 @@ _CATEGORY_NEGATIVES: dict[str, tuple[str, ...]] = {
     "bike": ("helmet", "lock", "pump", "шлем", "замок", "насос", "запчасти"),
 }
 
-_GROUP_OF: dict[str, tuple[str, tuple[str, ...]]] = {
-    word: (category, group) for category, group in _GROUPS for word in group
-}
-
 _SPEC_TOKEN = re.compile(
     r"^\d+(?:[.,]\d+)?(?:gb|tb|mb|гб|тб|мб|inch|cm|см|kg|кг|l|л|w|вт|mah|мач)$"
 )
@@ -98,7 +77,7 @@ def _variants(tokens: list[str]) -> list[str]:
     # EN <-> RU swaps, one glossary token at a time (keeps the rest of the query intact).
     for index, token in enumerate(tokens):
         entry = _GROUP_OF.get(token)
-        if entry is None:
+        if entry is None or entry[0] in _NO_SWAP:
             continue
         for alternative in entry[1]:
             if alternative != token:
@@ -117,8 +96,106 @@ def _variants(tokens: list[str]) -> list[str]:
     return variants
 
 
+_CYRILLIC = re.compile(r"[а-я]")
+_ROOMS = re.compile(r"^\d+$")
+
+# English search phrases per kind of property (first = primary, the rest are variants).
+_KIND_EN = {
+    "apartment": ("apartment", "flat"),
+    "house": ("house",),
+    "villa": ("villa",),
+    "studio": ("studio",),
+    "penthouse": ("penthouse",),
+    "townhouse": ("townhouse",),
+    "room": ("room",),
+}
+
+
+def _ru_bedrooms(count: int) -> str:
+    if count == 1:
+        return "спальня"
+    return "спальни" if 2 <= count <= 4 else "спален"
+
+
+def _ru_phrases(kind: str, rooms: int | None) -> list[str]:
+    """How Russian-speaking sellers write the same ad title."""
+    if kind == "apartment":
+        if rooms is None:
+            return ["квартира"]
+        return [f"{rooms}-комнатная квартира", f"квартира {rooms} {_ru_bedrooms(rooms)}"]
+    simple = {
+        "studio": "студия",
+        "penthouse": "пентхаус",
+        "townhouse": "таунхаус",
+        "room": "комната",
+    }
+    if kind in simple:
+        return [simple[kind]]
+    noun = "дом" if kind == "house" else "вилла"
+    return [noun] if rooms is None else [f"{noun} {rooms} {_ru_bedrooms(rooms)}"]
+
+
+def _expand_property(text: str, tokens: list[str], canon: list[str], kind: str) -> ExpandedQuery:
+    """ "3-х комнатная квартира" and "3-bedroom apartment" become the SAME query.
+
+    The primary phrase is English ("3 bedroom apartment") whatever language was typed; the variants
+    are the English synonym ("3 bedroom flat") and the Russian way to write it ("3-комнатная
+    квартира"). Rent / sale words are intent (they pick the category), not text to match, so they
+    are dropped here; place names are translated; any other word is kept as typed.
+    """
+    rooms: int | None = None
+    en_extras: list[str] = []
+    ru_extras: list[str] = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if _ROOMS.match(token) and index + 1 < len(tokens) and canon[index + 1] == "bedroom":
+            rooms = int(token)
+            index += 2
+            continue
+        if (
+            canon[index] in PROPERTY_KINDS
+            or canon[index] == "bedroom"
+            or category_of(token) == "intent"
+        ):
+            index += 1
+            continue
+        if category_of(token) == "place":
+            forms = FORMS_OF[token]
+            en_extras.append(forms[0])
+            ru_extras.append(next((f for f in forms if _CYRILLIC.match(f)), forms[0]))
+        else:
+            en_extras.append(token)
+            ru_extras.append(token)
+        index += 1
+
+    lead = [f"{rooms} bedroom"] if rooms else []
+    en_nouns = _KIND_EN[kind]
+    primary = " ".join([*lead, en_nouns[0], *en_extras])
+    variants = [" ".join([*lead, noun, *en_extras]) for noun in en_nouns[1:]]
+    variants += [" ".join([phrase, *ru_extras]) for phrase in _ru_phrases(kind, rooms)]
+    return clean_expansion(
+        ExpandedQuery(
+            original=text,
+            normalized=primary,
+            variants=variants,
+            negative_terms=list(_GENERIC_NEGATIVES),
+            category_hint="property",
+        )
+    )
+
+
 def expand_with_rules(text: str) -> ExpandedQuery:
     normalized_input = normalize_input(text)
+
+    # Property searches get their own handling: room counts, rent/sale words and the Russian
+    # phrasing ("3-х комнатная квартира") all describe the same thing as "3 bedroom apartment".
+    room_tokens = _core_tokens(normalize_rooms(normalized_input))
+    room_canon = [canonical_token(t) for t in room_tokens]
+    kind = next((c for c in room_canon if c in PROPERTY_KINDS), None)
+    if kind is not None:
+        return _expand_property(text, room_tokens, room_canon, kind)
+
     tokens = _core_tokens(normalized_input)
     normalized = " ".join(tokens)
 
