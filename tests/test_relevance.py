@@ -35,8 +35,10 @@ class TestPhoneQuery:
             "iPhone 13 128GB Blue",
             "Apple iphone13 like new",
             "Айфон 13 в отличном состоянии",
-            "iPhone 13 Pro Max",  # same family: accepted on purpose
             "IPHONES 13 lot",  # plural endings
+            # Real Bazaraki titles: "battery" and "cable" describe a real phone when they follow it.
+            "Iphone 13 | 256gb | midnight | 100 battery | box, cable & case",
+            "Apple iPhone 13 128GB battery health 91%",
         ],
     )
     def test_keeps_the_product(self, title: str) -> None:
@@ -54,6 +56,32 @@ class TestPhoneQuery:
         ],
     )
     def test_drops_other_products_and_accessories(self, title: str) -> None:
+        assert not keeps(self.query, title)
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            # Real parts listings that used to pass: the part noun leads the title.
+            "Display apple iphone 13 original",
+            "Battery apple iphone 13 3240mah oem",
+            "Buzzer apple iphone 13 oem",
+            "Дисплей для iPhone 13",
+            "Tempered glass iphone 13",
+        ],
+    )
+    def test_drops_parts_that_lead_the_title(self, title: str) -> None:
+        assert not keeps(self.query, title)
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "iPhone 13 Pro Max",  # a different, pricier product
+            "Apple iPhone 13 pro 256gb",
+            "iPhone 13 mini 128gb",
+            "Айфон 13 про макс",
+        ],
+    )
+    def test_drops_other_tiers_of_the_same_number(self, title: str) -> None:
         assert not keeps(self.query, title)
 
     @pytest.mark.parametrize(
@@ -108,3 +136,42 @@ def test_unrelated_prefix_collisions_do_not_match() -> None:
     assert keeps(query, "Bikes for kids")
     assert not keeps(query, "Bicycle")  # needs a variant, not a fuzzy match
     assert not keeps(query, "Bikini")
+
+
+def test_a_tier_word_in_the_query_is_honoured() -> None:
+    query = expand_with_rules("iphone 13 pro")
+    assert keeps(query, "iPhone 13 Pro 256gb")
+    assert not keeps(query, "iPhone 13 Pro Max 256gb")  # max is not in the query
+    assert not keeps(query, "iPhone 13 128gb")  # the pro model was asked for
+
+
+def test_storage_must_match_when_both_sides_state_it() -> None:
+    query = expand_with_rules("iphone 13 128gb")
+    assert keeps(query, "iPhone 13 128GB blue")
+    assert keeps(query, "iPhone 13 blue")  # the seller did not state it: forgiven
+    assert keeps(query, "iPhone 13 | 256gb or 128gb versions")  # one of them matches
+    assert not keeps(query, "iPhone 13 256GB blue")
+
+
+def test_part_words_only_matter_for_categories_that_have_them() -> None:
+    query = expand_with_rules("sofa")  # category "furniture": no part list
+    assert keeps(query, "Screen sofa set")
+    laptop = expand_with_rules("laptop")
+    assert not keeps(laptop, "Screen laptop dell replacement")
+    assert keeps(laptop, "Laptop dell 15 inch screen cracked corner")
+
+
+def test_llm_style_category_hints_are_case_insensitive() -> None:
+    query = expand_with_rules("iphone 13").model_copy(update={"category_hint": "PHONE"})
+    assert not keeps(query, "Display apple iphone 13 original")
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "iPhone 13 128gb box, charger & case",  # "box" / "&" bundle the accessories
+        "iPhone 13 128gb with original box",
+    ],
+)
+def test_ampersand_and_box_mark_a_bundle(title: str) -> None:
+    assert keeps(expand_with_rules("iphone 13"), title)
